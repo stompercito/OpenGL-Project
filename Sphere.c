@@ -52,9 +52,9 @@ Sphere sphere_create(float radius, int parallels, int meridians, vec3 sphereColo
 	//Puntos, colores y normales.
 	for(int i = 0; i < parallels -1; i++){
 		angTheta = 0;
-		red = sphereColor[0]*0.8 + 0.2 * rand()/RAND_MAX;
-		green = sphereColor[1]*0.8 + 0.2 * rand()/RAND_MAX;
-		blue = sphereColor[2]*0.8 + 0.2 * rand()/RAND_MAX;
+		red = sphereColor[0];
+		green = sphereColor[1];
+		blue = sphereColor[2];
 		for(int j = 0; j < meridians; j++){
 			//Calculo de i y de i + 1
 
@@ -128,7 +128,6 @@ void sphere_bind(Sphere sphere, GLuint vertexPosLoc, GLuint vertexColorLoc, GLui
 
 
 void sphere_draw(Sphere sphere){
-    glClear(GL_COLOR_BUFFER_BIT);
 	glBindVertexArray(sphere->sphereVA);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphere->sphereBuffers[3]);
 	glDrawElements(GL_TRIANGLE_STRIP, (sphere->vertexNum + sphere->parallels) ,GL_UNSIGNED_INT,0);

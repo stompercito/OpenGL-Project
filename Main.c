@@ -353,13 +353,30 @@ static void keyPressedFunc(unsigned char key, int x, int y) {
 
 	}
 }
+static int clicX, clicY;
+static void mousePasiveMotionFunc(int x, int y){
+	clicX = x;
+	clicY = y;
+
+}
 static void mouseMotionFunc(int x, int y){
-//	float w = glutGet(GLUT_WINDOW_WIDTH)/2.0;
-//	float h = glutGet(GLUT_WINDOW_HEIGHT)/2.0;
-//	glutWarpPointer(w,h);
+	if(camaraDirection != IDLE)return;
+	float disX = (abs(x - clicX))/(float)glutGet(GLUT_WINDOW_WIDTH);
+	float disY = (abs(y - clicY))/(float)glutGet(GLUT_WINDOW_HEIGHT);
+	if(disX > disY){
+		if(disX > 0.35){
+			if(x>clicX) camaraDirection = RIGHT;
+			else camaraDirection = LEFT;
+		}
+	}
+	else if(disY > disX){
+		if(disY > 0.3){
+			if(y > clicY)camaraDirection = DOWN;
+			else camaraDirection = UP;
+		}
+	}
 }
-static void clicFunc(int button, int state,int x, int y){
-}
+
 
 int main(int argc, char **argv) {
 	glutInit(&argc, argv);
@@ -374,9 +391,9 @@ int main(int argc, char **argv) {
     glutKeyboardUpFunc(keyReleasedFunc);
     glutSpecialFunc(specialKeyPressedFunc);
     glutSpecialUpFunc(specialKeyReleasedFunc);
+    //glutMouseFunc(mouseFunc);				//este te dice cuando hubo un cambio en los botones del raton
     glutMotionFunc(mouseMotionFunc);		//detecta la posicion del raton cuando esta el clic presionado
-    glutPassiveMotionFunc(mouseMotionFunc); //este cuando no lo esta presionado
-    glutMouseFunc(clicFunc);				//este te dice cuando hubo un cambio en los botones del raton
+    glutPassiveMotionFunc(mousePasiveMotionFunc); //este cuando no lo esta presionado
     glewInit();
     glEnable(GL_DEPTH_TEST);
     //glutSetCursor(GLUT_CURSOR_NONE);		//te hace invisible el raton

@@ -80,7 +80,7 @@ static void initCube(){
 	float h1 = -CUBE_HEIGHT / 2, h2 = CUBE_HEIGHT / 2;
 	float d1 = -CUBE_DEPTH  / 2, d2 = CUBE_DEPTH  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
+			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // AtrÃ¡s
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -156,6 +156,7 @@ static void drawCube(GLuint VA, GLuint id){
 
 static const float hubSize = 0.2;
 static const float hubColor = 1;
+
 static void initHub(){
 	float s = hubSize/2;
 	float h = hubColor;
@@ -188,12 +189,13 @@ static void drawHub(){
 
 Sphere sphere;
 
-static const float SPHERE_RADIUS = 1;
-static const int SPHERE_COLUMNS  = 10;
-static const int SPHERE_ROWS	 = 10;
-static const float SPHERE_RED	 = 0.8;
-static const float SPHERE_GREEN	 = 0.8;
-static const float SPHERE_BLUE	 = 0.8;
+static const float SPHERE_RADIUS  = 1;
+static const int   SPHERE_COLUMNS = 10;
+static const int   SPHERE_ROWS	  = 10;
+static const float SPHERE_RED	  = 0.8;
+static const float SPHERE_GREEN	  = 0.8;
+static const float SPHERE_BLUE	  = 0.8;
+
 static void initSphere(){
 	vec3 color = {SPHERE_RED,SPHERE_GREEN,SPHERE_BLUE};
 	sphere = sphere_create(SPHERE_RADIUS, SPHERE_COLUMNS, SPHERE_ROWS, color);
@@ -208,9 +210,10 @@ typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
 static float rotationSpeed = 1;
 static MOTION_TYPE camaraDirection = IDLE;
 
-//variables que almacena la posicion y señala el movimiento del objeto(esfera)
+//variables que almacena la posicion y seÃ±ala el movimiento del objeto(esfera)
 
-static MOTION_TYPE move = IDLE;
+static MOTION_TYPE sphereMove = IDLE;
+static const float SPHERE_SPEED = 0.5;
 static float sphereX = 0;
 static float sphereY = 0;
 static float sphereZ = CUBE_DEPTH/2+SPHERE_RADIUS;
@@ -229,11 +232,11 @@ void collisionFunc(){
 
 	//evaluacion de colision
 
-	//Se debe de enviar la posicion del cilindro
+	//Se debe de enviar la posicion de la esfera
 
 	glUniform3fv(positionLoc2,1,position);
 
-	//Se envia matriz de proyección
+	//Se envia matriz de proyecciÃ³n
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
 	//se envia matriz de vista
@@ -266,11 +269,34 @@ static void rotateDirection();
 void viewFunc();
 
 
+void moveSphere(){
+	if(camaraDirection != IDLE)return;
+	if(sphereMove == UP){
+		sphereX += SPHERE_SPEED*right.x;
+		sphereY += SPHERE_SPEED*right.y;
+		sphereZ += SPHERE_SPEED*right.z;
+	}
+	else if(sphereMove == DOWN){
+		sphereX -= SPHERE_SPEED*right.x;
+		sphereY -= SPHERE_SPEED*right.y;
+		sphereZ -= SPHERE_SPEED*right.z;
+	}
+	else if(sphereMove == RIGHT){
+		sphereX += SPHERE_SPEED*up.x;
+		sphereY += SPHERE_SPEED*up.y;
+		sphereZ += SPHERE_SPEED*up.z;
+	}
+	else if(sphereMove == LEFT){
+		sphereX -= SPHERE_SPEED*up.x;
+		sphereY -= SPHERE_SPEED*up.y;
+		sphereZ -= SPHERE_SPEED*up.z;
+	}
+}
 
 static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-//	Actualizar posición de la cámara
+	moveSphere();
 
 
 	//colisiones
@@ -280,7 +306,7 @@ static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(programId1);
-	//Se envia matriz de proyección
+	//Se envia matriz de proyecciÃ³n
 	glUniformMatrix4fv(projectionMatrixLoc, 1, true,projectionMatrix.values);
 
 	//se envia matriz de vista
@@ -323,33 +349,34 @@ static void timerFunc(int id) {
 }
 
 static void specialKeyReleasedFunc(int key,int x, int y) {
+	sphereMove = IDLE;
 }
 
 static void keyReleasedFunc(unsigned char key,int x, int y) {
+	sphereMove = IDLE;
 }
 
 static void specialKeyPressedFunc(int key, int x, int y) {
-	if(camaraDirection != IDLE)return;
+
 	switch(key) {
-		case 100: camaraDirection = LEFT;  break;
-		case 102: camaraDirection = RIGHT; break;
-		case 101: camaraDirection = UP; break;
-		case 103: camaraDirection = DOWN;break;
+		case 100: sphereMove = LEFT;  break;
+		case 102: sphereMove = RIGHT; break;
+		case 101: sphereMove = UP; break;
+		case 103: sphereMove = DOWN;break;
 	}
 }
 
 static void keyPressedFunc(unsigned char key, int x, int y) {
 	if(key == 27)exit(0);
-	if(camaraDirection != IDLE)return;
 	switch(key) {
 	case 'a':
-	case 'A': camaraDirection = LEFT;break;
+	case 'A': sphereMove = LEFT;break;
 	case 'd':
-	case 'D': camaraDirection = RIGHT;break;
+	case 'D': sphereMove = RIGHT;break;
 	case 'w':
-	case 'W': camaraDirection = UP;break;
+	case 'W': sphereMove = UP;break;
 	case 's':
-	case 'S': camaraDirection = DOWN;break;
+	case 'S': sphereMove = DOWN;break;
 
 	}
 }
@@ -739,18 +766,3 @@ static void rotateDirection(){
 	right.z = z?!neg_z?1:-1:0;
 	printf("Cara: %d Sub: %d,\t up<%.1f,%.1f,%.1f>, right<%.1f,%.1f,%.1f>\n",camaraFace,v,up.x,up.y,up.z,right.x,right.y,right.z);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

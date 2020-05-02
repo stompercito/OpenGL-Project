@@ -12,44 +12,11 @@
 
 #define toRadians(deg) deg * M_PI / 180.0
 
-typedef enum { IDLE, LEFT, RIGHT, UP, DOWN, FRONT, BACK } MOTION_TYPE;
 
 static Mat4   modelMatrix, projectionMatrix, viewMatrix;
 static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc; //dibujado
 static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2; //colision
 static GLuint programId3,vertexPositionLoc3,vertexColorLoc3; //Hub
-
-//variables que almacena la posicion y seï¿½ala el movimiento del objeto(esfera)
-static MOTION_TYPE move = IDLE;
-vec3 position;
-
-// variables de rotaciones y de la cara visible
-Vec4 up = {1,0,0,0};
-Vec4 right ={0,1,0,0};
-int camaraFace = 0;
-MOTION_TYPE camaraLad = DOWN;
-
-//InicializaciÃ³n del cubo//
-static const float CUBE_WIDTH = 20;
-static const float CUBE_HEIGHT = 20;
-static const float CUBE_DEPTH = 20;
-
-//Variables necesarias para la esfera//
-
-Sphere sphere;
-
-static const float SPHERE_RADIUS = 1;
-static const int SPHERE_COLUMNS  = 10;
-static const int SPHERE_ROWS	 = 10;
-static const float SPHERE_RED	 = 0.8;
-static const float SPHERE_GREEN	 = 0.8;
-static const float SPHERE_BLUE	 = 0.8;
-
-static float sphereX = 0;
-static float sphereY = 0;
-static float sphereZ = CUBE_DEPTH/2+SPHERE_RADIUS;
-static float sphereSpeed = 0.10;
-static MOTION_TYPE sphereType = 0;
 
 GLuint cubeVA, cubeIndBufferId; 		//dibujado
 GLuint cubeVA2, cubeIndBufferId2;		//colision
@@ -105,13 +72,15 @@ static void initShaders() {
 	vertexPositionLoc3   = glGetAttribLocation(programId3, "vertexPosition");
 	//vertexColorLoc3   = glGetAttribLocation(programId3, "vertexColor");
 }
-
+static const float CUBE_WIDTH = 20;
+static const float CUBE_HEIGHT = 20;
+static const float CUBE_DEPTH = 20;
 static void initCube(){
 	float w1 = -CUBE_WIDTH  / 2, w2 = CUBE_WIDTH  / 2;
 	float h1 = -CUBE_HEIGHT / 2, h2 = CUBE_HEIGHT / 2;
 	float d1 = -CUBE_DEPTH  / 2, d2 = CUBE_DEPTH  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrï¿½s
+			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -217,7 +186,14 @@ static void drawHub(){
 	glDrawArrays(GL_LINES,0,4);
 }
 
+Sphere sphere;
 
+static const float SPHERE_RADIUS = 1;
+static const int SPHERE_COLUMNS  = 10;
+static const int SPHERE_ROWS	 = 10;
+static const float SPHERE_RED	 = 0.8;
+static const float SPHERE_GREEN	 = 0.8;
+static const float SPHERE_BLUE	 = 0.8;
 static void initSphere(){
 	vec3 color = {SPHERE_RED,SPHERE_GREEN,SPHERE_BLUE};
 	sphere = sphere_create(SPHERE_RADIUS, SPHERE_COLUMNS, SPHERE_ROWS, color);
@@ -225,8 +201,28 @@ static void initSphere(){
 	sphere_bind(sphere, vertexPositionLoc, vertexColorLoc, vertexNormalLoc);
 }
 
+
+typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
+
+
 static float rotationSpeed = 1;
 static MOTION_TYPE camaraDirection = IDLE;
+
+//variables que almacena la posicion y señala el movimiento del objeto(esfera)
+
+static MOTION_TYPE move = IDLE;
+static float sphereX = 0;
+static float sphereY = 0;
+static float sphereZ = CUBE_DEPTH/2+SPHERE_RADIUS;
+vec3 position;
+
+
+// variables de rotaciones y de la cara visible
+Vec4 up = {1,0,0,0};
+Vec4 right ={0,1,0,0};
+int camaraFace = 0;
+MOTION_TYPE camaraLad = DOWN;
+
 
 void collisionFunc(){
 	glUseProgram(programId2);
@@ -237,7 +233,7 @@ void collisionFunc(){
 
 	glUniform3fv(positionLoc2,1,position);
 
-	//Se envia matriz de proyecciï¿½n
+	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
 	//se envia matriz de vista
@@ -274,30 +270,17 @@ void viewFunc();
 static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-//	Actualizar posiciï¿½n de la cï¿½mara
+//	Actualizar posición de la cámara
 
 
 	//colisiones
 	//collisionFunc();
-	//	Actualizar posiciÃ³n de la esfera
-
-	traslateDirection();
-
-	switch(sphereType) {
-		case  LEFT  :  sphereX -= sphereSpeed; break;
-		case  RIGHT :  sphereX += sphereSpeed; break;
-		case  UP    :  sphereY += sphereSpeed; break;
-		case  DOWN  :  sphereY -= sphereSpeed; break;
-		case  FRONT :  sphereZ -= sphereSpeed; break;
-		case  BACK  :  sphereZ += sphereSpeed; break;
-		case  IDLE  : ;
-	}
 
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(programId1);
-	//Se envia matriz de proyecciï¿½n
+	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc, 1, true,projectionMatrix.values);
 
 	//se envia matriz de vista
@@ -343,7 +326,6 @@ static void specialKeyReleasedFunc(int key,int x, int y) {
 }
 
 static void keyReleasedFunc(unsigned char key,int x, int y) {
-	sphereType = IDLE;
 }
 
 static void specialKeyPressedFunc(int key, int x, int y) {
@@ -358,43 +340,26 @@ static void specialKeyPressedFunc(int key, int x, int y) {
 
 static void keyPressedFunc(unsigned char key, int x, int y) {
 	if(key == 27)exit(0);
-
+	if(camaraDirection != IDLE)return;
 	switch(key) {
 	case 'a':
-	case 'A': sphereType = LEFT;break;
+	case 'A': camaraDirection = LEFT;break;
 	case 'd':
-	case 'D': sphereType = RIGHT;break;
+	case 'D': camaraDirection = RIGHT;break;
 	case 'w':
-	case 'W': sphereType = UP;break;
+	case 'W': camaraDirection = UP;break;
 	case 's':
-	case 'S': sphereType = DOWN;break;
+	case 'S': camaraDirection = DOWN;break;
 
 	}
-}
-static int clicX, clicY;
-static void mousePasiveMotionFunc(int x, int y){
-	clicX = x;
-	clicY = y;
-
 }
 static void mouseMotionFunc(int x, int y){
-	if(camaraDirection != IDLE)return;
-	float disX = (abs(x - clicX))/(float)glutGet(GLUT_WINDOW_WIDTH);
-	float disY = (abs(y - clicY))/(float)glutGet(GLUT_WINDOW_HEIGHT);
-	if(disX > disY){
-		if(disX > 0.35){
-			if(x>clicX) camaraDirection = RIGHT;
-			else camaraDirection = LEFT;
-		}
-	}
-	else if(disY > disX){
-		if(disY > 0.3){
-			if(y > clicY)camaraDirection = DOWN;
-			else camaraDirection = UP;
-		}
-	}
+//	float w = glutGet(GLUT_WINDOW_WIDTH)/2.0;
+//	float h = glutGet(GLUT_WINDOW_HEIGHT)/2.0;
+//	glutWarpPointer(w,h);
 }
-
+static void clicFunc(int button, int state,int x, int y){
+}
 
 int main(int argc, char **argv) {
 	glutInit(&argc, argv);
@@ -409,9 +374,9 @@ int main(int argc, char **argv) {
     glutKeyboardUpFunc(keyReleasedFunc);
     glutSpecialFunc(specialKeyPressedFunc);
     glutSpecialUpFunc(specialKeyReleasedFunc);
-    //glutMouseFunc(mouseFunc);				//este te dice cuando hubo un cambio en los botones del raton
     glutMotionFunc(mouseMotionFunc);		//detecta la posicion del raton cuando esta el clic presionado
-    glutPassiveMotionFunc(mousePasiveMotionFunc); //este cuando no lo esta presionado
+    glutPassiveMotionFunc(mouseMotionFunc); //este cuando no lo esta presionado
+    glutMouseFunc(clicFunc);				//este te dice cuando hubo un cambio en los botones del raton
     glewInit();
     glEnable(GL_DEPTH_TEST);
     //glutSetCursor(GLUT_CURSOR_NONE);		//te hace invisible el raton
@@ -463,37 +428,6 @@ void viewFunc(){
 
 
 
-}
-
-static void traslateDirection(){
-	if(camaraFace == 0) {
-
-		} else if(camaraFace == 1) {
-			if(sphereType == UP) sphereType = FRONT;
-			else if(sphereType == DOWN) sphereType = BACK;
-			else if(sphereType == RIGHT);
-			else if(sphereType == LEFT);
-		} else if(camaraFace == 2) {
-			if(sphereType == UP);
-			else if(sphereType == DOWN);
-			else if(sphereType == RIGHT) sphereType = LEFT;
-			else if(sphereType == LEFT) sphereType = RIGHT;
-		} else if(camaraFace == 3) {
-			if(sphereType == UP) sphereType = BACK;
-			else if(sphereType == DOWN) sphereType = FRONT;
-			else if(sphereType == RIGHT);
-			else if(sphereType == LEFT);
-		} else if(camaraFace == 4) {
-			if(sphereType == UP);
-			else if(sphereType == DOWN);
-			else if(sphereType == RIGHT) sphereType = BACK;
-			else if(sphereType == LEFT) sphereType = FRONT;
-		} else if(camaraFace == 5) {
-			if(sphereType == UP);
-			else if(sphereType == DOWN);
-			else if(sphereType == RIGHT) sphereType = FRONT;
-			else if(sphereType == LEFT) sphereType = BACK;
-		}
 }
 
 static void rotateDirection(){

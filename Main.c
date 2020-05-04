@@ -1,6 +1,7 @@
 
 #include <GL/glew.h>
 #include <GL/freeglut.h>
+#include <string.h>
 #include "Transforms.h"
 #include "Utils.h"
 #include <stdio.h>
@@ -11,16 +12,18 @@
 
 
 #define toRadians(deg) deg * M_PI / 180.0
-
+static int paredes = 100 + ((100/10)-1);
 
 static Mat4   modelMatrix, projectionMatrix, viewMatrix;
 static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc; //dibujado
+static GLuint programId4, vertexPositionLoc4,vertexColorLoc4, vertexNormalLoc4, modelMatrixLoc4,  projectionMatrixLoc4,  viewMatrixLoc4; //Pared
 static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2; //colision
 static GLuint programId3,vertexPositionLoc3,vertexColorLoc3; //Hub
 
-GLuint cubeVA, cubeIndBufferId; 		//dibujado
-GLuint cubeVA2, cubeIndBufferId2;		//colision
-GLuint miraVA;							//hub
+GLuint cubeVA, cubeIndBufferId; 			//dibujado //Se necesita para cada cubo
+GLuint cubeVA2, cubeIndBufferId2;			//colision
+GLuint cubeVA3[109], cubeIndBufferId3[109];   //Pared
+GLuint miraVA;								//hub
 
 #define RESET 0xFFFFFFFF
 
@@ -37,7 +40,6 @@ static void initShaders() {
 	vertexPositionLoc   = glGetAttribLocation(programId1, "vertexPosition");
 	vertexColorLoc 		= glGetAttribLocation(programId1, "vertexColor");
 	vertexNormalLoc		= glGetAttribLocation(programId1, "vertexNormal");
-
 	modelMatrixLoc      = glGetUniformLocation(programId1, "modelMatrix");
 	viewMatrixLoc       = glGetUniformLocation(programId1, "viewMatrix");
 	projectionMatrixLoc = glGetUniformLocation(programId1, "projMatrix");
@@ -53,7 +55,6 @@ static void initShaders() {
 	glLinkProgram(programId2);
 
 	vertexPositionLoc2   = glGetAttribLocation(programId2, "vertexPosition");
-
 	modelMatrixLoc2      = glGetUniformLocation(programId2, "modelMatrix");
 	viewMatrixLoc2       = glGetUniformLocation(programId2, "viewMatrix");
 	projectionMatrixLoc2 = glGetUniformLocation(programId2, "projMatrix");
@@ -69,12 +70,28 @@ static void initShaders() {
 	glAttachShader(programId3, fShader);
 	glLinkProgram(programId3);
 
-	vertexPositionLoc3   = glGetAttribLocation(programId3, "vertexPosition");
-	//vertexColorLoc3   = glGetAttribLocation(programId3, "vertexColor");
+
+	//Paredes
+	vShader = compileShader("shaders/simple.vsh", GL_VERTEX_SHADER);
+	if(!shaderCompiled(vShader)) return;
+	fShader = compileShader("shaders/simple.fsh", GL_FRAGMENT_SHADER);
+	if(!shaderCompiled(fShader)) return;
+	programId4 = glCreateProgram();
+	glAttachShader(programId4, vShader);
+	glAttachShader(programId4, fShader);
+	glLinkProgram(programId4);
+
+	vertexPositionLoc4   = glGetAttribLocation(programId4, "vertexPosition");
+	vertexColorLoc4 		= glGetAttribLocation(programId4, "vertexColor");
+	vertexNormalLoc4		= glGetAttribLocation(programId4, "vertexNormal");
+	modelMatrixLoc4      = glGetUniformLocation(programId4, "modelMatrix");
+	viewMatrixLoc4       = glGetUniformLocation(programId4, "viewMatrix");
+	projectionMatrixLoc4 = glGetUniformLocation(programId4, "projMatrix");
 }
 static const float CUBE_WIDTH = 20;
 static const float CUBE_HEIGHT = 20;
 static const float CUBE_DEPTH = 20;
+
 static void initCube(){
 	float w1 = -CUBE_WIDTH  / 2, w2 = CUBE_WIDTH  / 2;
 	float h1 = -CUBE_HEIGHT / 2, h2 = CUBE_HEIGHT / 2;
@@ -126,8 +143,6 @@ static void initCube(){
 	glPrimitiveRestartIndex(RESET);
 	glEnable(GL_PRIMITIVE_RESTART);
 
-
-
 	glUseProgram(programId2);
 	glGenVertexArrays(1, &cubeVA2);
 	glBindVertexArray(cubeVA2);
@@ -152,6 +167,65 @@ static void drawCube(GLuint VA, GLuint id){
 	glBindVertexArray(VA);
 	glBindBuffer(GL_ARRAY_BUFFER,id);
 	glDrawElements(GL_TRIANGLE_FAN, 4*6+5, GL_UNSIGNED_INT, 0);
+}
+
+static const float CUBE_WIDTH2 = 2;
+static const float CUBE_HEIGHT2 = 2;
+static const float CUBE_DEPTH2 = 2;
+
+static void initParedes(){
+	float w1 = -CUBE_WIDTH2  / 2, w2 = CUBE_WIDTH2  / 2;
+		float h1 = -CUBE_HEIGHT2 / 2, h2 = CUBE_HEIGHT2 / 2;
+		float d1 = -CUBE_DEPTH2  / 2, d2 = CUBE_DEPTH2  / 2;
+		float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
+				             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
+								w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
+								w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
+								w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
+								w1, h2, d2, 	w1, h2, d1, 	w2, h2, d1, 	w2, h2, d2   // Arriba
+		};
+		float colors[] = {  	1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+		};
+		GLuint indices[4*6+5];
+		int pos = 0;
+		for(int i = 0; i<6;i++){
+			for(int j = 0;j<4;j++){
+				indices[pos] = i*4+j;
+				pos++;
+			}
+			if(i<5)indices[pos] = RESET;
+			pos++;
+		}
+
+	for(int i = 0; i < paredes; i++) { //Cambiar variables
+			glUseProgram(programId4);
+			glGenVertexArrays(1, &cubeVA3[i]); //
+			glBindVertexArray(cubeVA3[i]);//
+			GLuint buffers[3];
+			glGenBuffers(3, buffers);
+
+			glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+			glVertexAttribPointer(vertexPositionLoc4, 3, GL_FLOAT, 0, 0, 0);
+			glEnableVertexAttribArray(vertexPositionLoc4);
+
+			glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+			glVertexAttribPointer(vertexColorLoc4, 3, GL_FLOAT, 0, 0, 0);
+			glEnableVertexAttribArray(vertexColorLoc4);
+
+			cubeIndBufferId3[i] = buffers[2]; //
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
+			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
+
+			glPrimitiveRestartIndex(RESET);
+			glEnable(GL_PRIMITIVE_RESTART);
+		}
 }
 
 static const float hubSize = 0.2;
@@ -318,8 +392,63 @@ void moveAndCollisionFunc(){
 		if (collision)returnHorizontalSphere();
 	}
 
+}
+
+static bool bandera = true;
+
+static float cubeX[110];
+static float cubeY[110];
+static float cubeZ[110];
 
 
+static void readTxtAndDraw() {
+	bool bandera2 = true;
+
+	int valor = -CUBE_WIDTH/2+CUBE_WIDTH2/2;
+	cubeX[0] = valor;
+	int valor2 = (CUBE_HEIGHT/2)-(CUBE_HEIGHT2/2);
+	cubeY[0] = valor2;
+	cubeZ[0] = CUBE_DEPTH/2+CUBE_DEPTH2/2;
+	 FILE *archivo;
+	   int c;
+	   int j = 0;
+
+	   archivo = fopen("test.txt","r");
+
+		   for(int i = 0; i < paredes; i++) {
+		      c = fgetc(archivo);
+		      if( feof(archivo) ) {
+		         break ;
+		      }
+
+		      if(c == '1'){
+		    	  if(bandera)printf("%c\n", c);
+
+			      mIdentity(&modelMatrix);
+			      translate(&modelMatrix,cubeX[i], cubeY[i], cubeZ[i]);
+			      glUniformMatrix4fv(modelMatrixLoc4, 1, true, modelMatrix.values);
+			      drawCube(cubeVA3[i], cubeIndBufferId3[i]);
+		      }
+
+		      if(c == ';'){
+		    	  if(bandera)printf("%c\n", c);
+		    	  j++;
+		    	  bandera2 = !bandera2;
+		    	  valor2 = cubeY[i] - CUBE_WIDTH2;
+		      }
+
+			      if(bandera2) {
+			    	  cubeX[i+1] = cubeX[i] + CUBE_WIDTH2;
+			      } else {
+			    	  cubeX[i+1] = cubeX[i] - CUBE_WIDTH2;
+			      }
+
+			      cubeY[i+1] = valor2;
+			      cubeZ[i] = CUBE_DEPTH/2+CUBE_DEPTH2/2;
+
+		   }
+		   bandera = false;
+	   fclose(archivo);
 
 
 }
@@ -328,8 +457,8 @@ void moveAndCollisionFunc(){
 static void rotateDirection();
 void viewFunc();
 
-
 void moveVerticalSphere(){
+
 	if(camaraDirection != IDLE)return;
 	if(sphereVerticalMove == UP){
 		sphereX += SPHERE_SPEED*right.x;
@@ -345,6 +474,7 @@ void moveVerticalSphere(){
 	position[1] = sphereY;
 	position[2] = sphereZ;
 }
+
 void moveHorizontalSphere(){
 	if(camaraDirection != IDLE)return;
 	if(sphereHorizontalMove == RIGHT){
@@ -409,6 +539,7 @@ static void displayFunc() {
 
 	//se envia matriz de vista
 	translate(&viewMatrix, 0, 0, -40);
+
 	//Se actualiza la rotacion de la matriz
 	viewFunc();
 	glUniformMatrix4fv(viewMatrixLoc, 1, true, viewMatrix.values);
@@ -421,6 +552,7 @@ static void displayFunc() {
 	drawCube(cubeVA, cubeIndBufferId);
 
 	//SE DIBUJARAN LAS PAREDES
+	readTxtAndDraw();
 
 	//Se dibuja la esfera
 	mIdentity(&modelMatrix);
@@ -541,6 +673,7 @@ int main(int argc, char **argv) {
     initShaders();
     mIdentity(&viewMatrix);
     initCube();
+    initParedes();
     initHub();
     initSphere();
     glClearColor(0.1, 0.1, 0.1, 1.0);
@@ -879,18 +1012,3 @@ static void rotateDirection(){
 	right.z = z?!neg_z?1:-1:0;
 	printf("Cara: %d Sub: %d,\t up<%.1f,%.1f,%.1f>, right<%.1f,%.1f,%.1f>\n",camaraFace,v,up.x,up.y,up.z,right.x,right.y,right.z);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

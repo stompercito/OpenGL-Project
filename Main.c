@@ -212,7 +212,8 @@ static MOTION_TYPE camaraDirection = IDLE;
 
 //variables que almacena la posicion y señala el movimiento del objeto(esfera)
 
-static MOTION_TYPE sphereMove = IDLE;
+static MOTION_TYPE sphereVerticalMove = IDLE;
+static MOTION_TYPE sphereHorizontalMove = IDLE;
 static const float SPHERE_SPEED = 0.5;
 static float sphereX = 0;
 static float sphereY = 0;
@@ -226,16 +227,14 @@ Vec4 right ={0,1,0,0};
 int camaraFace = 0;
 MOTION_TYPE camaraLad = DOWN;
 
-
-void collisionFunc(){
+void moveVerticalSphere();
+void moveHorizontalSphere();
+void returnVerticalSphere();
+void returnHorizontalSphere();
+void moveAndCollisionFunc(){
 	glUseProgram(programId2);
 
-	//evaluacion de colision
-
-	//Se debe de enviar la posicion de la esfera
-
-	glUniform3fv(positionLoc2,1,position);
-
+	//Se envia la informacion que no cambia
 	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
@@ -246,22 +245,83 @@ void collisionFunc(){
 
 	//Se envia matriz de modelo
 
+	mIdentity(&modelMatrix);
 	glUniformMatrix4fv(modelMatrixLoc2, 1, true, modelMatrix.values);
-	drawCube(cubeVA2, cubeIndBufferId2);
 
-	int width = glutGet(GLUT_WINDOW_WIDTH);
-	int height = glutGet(GLUT_WINDOW_HEIGHT);
-	float* pixels = (float*)malloc(sizeof(float)*width*height*3);
-	glReadPixels(0,0,width,height,GL_RGB,GL_FLOAT,pixels);
 
-	int collision = 0;
-	for(int i= 0; i<width*height*3;i++){
-		if(pixels[i]  == 1){
+	//Se mueve y evalua verticalmente
+
+	if (sphereVerticalMove != IDLE) {
+		moveVerticalSphere();
+		//Se debe de enviar la posicion de la esfera
+		glUniform3fv(positionLoc2, 1, position);
+		drawCube(cubeVA2, cubeIndBufferId2);
+		/*
+				if (abs(sphereX) > (CUBE_WIDTH / 2 + SPHERE_RADIUS))
+			sphereX = (sphereX<0)?-(CUBE_WIDTH / 2 + SPHERE_RADIUS):(CUBE_WIDTH / 2 + SPHERE_RADIUS);
+		if (abs(sphereY) > (CUBE_HEIGHT / 2 + SPHERE_RADIUS))
+			sphereY = (sphereY<0)?-(CUBE_HEIGHT / 2 + SPHERE_RADIUS):(CUBE_HEIGHT / 2 + SPHERE_RADIUS);
+		if (abs(sphereZ) > (CUBE_DEPTH / 2 + SPHERE_RADIUS))
+			sphereZ = (sphereZ<0)?-(CUBE_DEPTH / 2 + SPHERE_RADIUS):(CUBE_DEPTH / 2 + SPHERE_RADIUS);
+		 */
+		int collision = 0;
+		if (abs(sphereX) > (CUBE_WIDTH / 2 + SPHERE_RADIUS))
 			collision = 1;
-			break;
+		if (abs(sphereY) > (CUBE_HEIGHT / 2 + SPHERE_RADIUS))
+			collision = 1;
+		if (abs(sphereZ) > (CUBE_DEPTH / 2 + SPHERE_RADIUS))
+			collision = 1;
+
+		int width = glutGet(GLUT_WINDOW_WIDTH);
+		int height = glutGet(GLUT_WINDOW_HEIGHT);
+		float* pixels = (float*) malloc(sizeof(float) * width * height * 3);
+		glReadPixels(0, 0, width, height, GL_RGB, GL_FLOAT, pixels);
+		for (int i = 0; i < width * height * 3; i++) {
+			if (collision)
+				break;
+			if (pixels[i] == 1) {
+				collision = 1;
+				break;
+			}
 		}
+		free(pixels);
+		if (collision)returnVerticalSphere();
 	}
-	free(pixels);
+
+	if (sphereHorizontalMove != IDLE) {
+		moveHorizontalSphere();
+		//Se debe de enviar la posicion de la esfera
+		glUniform3fv(positionLoc2, 1, position);
+		drawCube(cubeVA2, cubeIndBufferId2);
+
+		int width = glutGet(GLUT_WINDOW_WIDTH);
+		int height = glutGet(GLUT_WINDOW_HEIGHT);
+		float* pixels = (float*) malloc(sizeof(float) * width * height * 3);
+		glReadPixels(0, 0, width, height, GL_RGB, GL_FLOAT, pixels);
+
+		int collision = 0;
+		if (abs(sphereX) > (CUBE_WIDTH / 2 + SPHERE_RADIUS))
+			collision = 1;
+		if (abs(sphereY) > (CUBE_HEIGHT / 2 + SPHERE_RADIUS))
+			collision = 1;
+		if (abs(sphereZ) > (CUBE_DEPTH / 2 + SPHERE_RADIUS))
+			collision = 1;
+		for (int i = 0; i < width * height * 3; i++) {
+			if (collision)
+				break;
+			if (pixels[i] == 1) {
+				collision = 1;
+				break;
+			}
+		}
+		free(pixels);
+		if (collision)returnHorizontalSphere();
+	}
+
+
+
+
+
 }
 
 
@@ -269,38 +329,76 @@ static void rotateDirection();
 void viewFunc();
 
 
-void moveSphere(){
+void moveVerticalSphere(){
 	if(camaraDirection != IDLE)return;
-	if(sphereMove == UP){
+	if(sphereVerticalMove == UP){
 		sphereX += SPHERE_SPEED*right.x;
 		sphereY += SPHERE_SPEED*right.y;
 		sphereZ += SPHERE_SPEED*right.z;
 	}
-	else if(sphereMove == DOWN){
+	else if(sphereVerticalMove == DOWN){
 		sphereX -= SPHERE_SPEED*right.x;
 		sphereY -= SPHERE_SPEED*right.y;
 		sphereZ -= SPHERE_SPEED*right.z;
 	}
-	else if(sphereMove == RIGHT){
+	position[0] = sphereX;
+	position[1] = sphereY;
+	position[2] = sphereZ;
+}
+void moveHorizontalSphere(){
+	if(camaraDirection != IDLE)return;
+	if(sphereHorizontalMove == RIGHT){
 		sphereX += SPHERE_SPEED*up.x;
 		sphereY += SPHERE_SPEED*up.y;
 		sphereZ += SPHERE_SPEED*up.z;
 	}
-	else if(sphereMove == LEFT){
+	else if(sphereHorizontalMove == LEFT){
 		sphereX -= SPHERE_SPEED*up.x;
 		sphereY -= SPHERE_SPEED*up.y;
 		sphereZ -= SPHERE_SPEED*up.z;
 	}
+	position[0] = sphereX;
+	position[1] = sphereY;
+	position[2] = sphereZ;
+}
+
+void returnHorizontalSphere(){
+	if(sphereHorizontalMove == LEFT){
+		sphereX += SPHERE_SPEED*up.x;
+		sphereY += SPHERE_SPEED*up.y;
+		sphereZ += SPHERE_SPEED*up.z;
+	}
+	else if(sphereHorizontalMove == RIGHT){
+		sphereX -= SPHERE_SPEED*up.x;
+		sphereY -= SPHERE_SPEED*up.y;
+		sphereZ -= SPHERE_SPEED*up.z;
+	}
+	position[0] = sphereX;
+	position[1] = sphereY;
+	position[2] = sphereZ;
+}
+
+void returnVerticalSphere(){
+	if(sphereVerticalMove == DOWN){
+		sphereX += SPHERE_SPEED*right.x;
+		sphereY += SPHERE_SPEED*right.y;
+		sphereZ += SPHERE_SPEED*right.z;
+	}
+	else if(sphereVerticalMove == UP){
+		sphereX -= SPHERE_SPEED*right.x;
+		sphereY -= SPHERE_SPEED*right.y;
+		sphereZ -= SPHERE_SPEED*right.z;
+	}
+	position[0] = sphereX;
+	position[1] = sphereY;
+	position[2] = sphereZ;
 }
 
 static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	moveSphere();
-
-
 	//colisiones
-	//collisionFunc();
+	moveAndCollisionFunc();
 
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -331,7 +429,7 @@ static void displayFunc() {
 	sphere_draw(sphere);
 
 	//Se dibuja el HUB
-	drawHub();
+	//drawHub();
 
 	glutSwapBuffers();
 }
@@ -349,20 +447,35 @@ static void timerFunc(int id) {
 }
 
 static void specialKeyReleasedFunc(int key,int x, int y) {
-	sphereMove = IDLE;
+	switch(key) {
+		case 100:
+		case 102: sphereHorizontalMove = IDLE; break;
+		case 101:
+		case 103: sphereVerticalMove = IDLE;break;
+	}
 }
 
 static void keyReleasedFunc(unsigned char key,int x, int y) {
-	sphereMove = IDLE;
+	switch(key) {
+	case 'a':
+	case 'A':
+	case 'd':
+	case 'D': sphereHorizontalMove = IDLE;break;
+	case 'w':
+	case 'W':
+	case 's':
+	case 'S': sphereVerticalMove = IDLE;break;
+
+	}
 }
 
 static void specialKeyPressedFunc(int key, int x, int y) {
 
 	switch(key) {
-		case 100: sphereMove = LEFT;  break;
-		case 102: sphereMove = RIGHT; break;
-		case 101: sphereMove = UP; break;
-		case 103: sphereMove = DOWN;break;
+		case 100: sphereHorizontalMove = LEFT;  break;
+		case 102: sphereHorizontalMove = RIGHT; break;
+		case 101: sphereVerticalMove = UP; break;
+		case 103: sphereVerticalMove = DOWN;break;
 	}
 }
 
@@ -370,13 +483,13 @@ static void keyPressedFunc(unsigned char key, int x, int y) {
 	if(key == 27)exit(0);
 	switch(key) {
 	case 'a':
-	case 'A': sphereMove = LEFT;break;
+	case 'A': sphereHorizontalMove = LEFT;break;
 	case 'd':
-	case 'D': sphereMove = RIGHT;break;
+	case 'D': sphereHorizontalMove = RIGHT;break;
 	case 'w':
-	case 'W': sphereMove = UP;break;
+	case 'W': sphereVerticalMove = UP;break;
 	case 's':
-	case 'S': sphereMove = DOWN;break;
+	case 'S': sphereVerticalMove = DOWN;break;
 
 	}
 }
@@ -766,3 +879,18 @@ static void rotateDirection(){
 	right.z = z?!neg_z?1:-1:0;
 	printf("Cara: %d Sub: %d,\t up<%.1f,%.1f,%.1f>, right<%.1f,%.1f,%.1f>\n",camaraFace,v,up.x,up.y,up.z,right.x,right.y,right.z);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

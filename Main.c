@@ -12,21 +12,28 @@
 
 
 #define toRadians(deg) deg * M_PI / 180.0
-static int paredes = 100 + ((100/10)-1);
 
 static Mat4   modelMatrix, projectionMatrix, viewMatrix;
 static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc; //dibujado
-static GLuint programId4, vertexPositionLoc4,vertexColorLoc4, vertexNormalLoc4, modelMatrixLoc4,  projectionMatrixLoc4,  viewMatrixLoc4; //Pared
-static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2; //colision
-static GLuint programId3,vertexPositionLoc3,vertexColorLoc3; //Hub
+static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2, radiusLoc2; //colision
 
-GLuint cubeVA, cubeIndBufferId; 			//dibujado //Se necesita para cada cubo
-GLuint cubeVA2, cubeIndBufferId2;			//colision
-GLuint cubeVA3[109], cubeIndBufferId3[109];   //Pared
-GLuint miraVA;								//hub
+GLuint cubeVA, cubeIndBufferId; 			//dibujado de cubo central
+GLuint cubeVA2, cubeIndBufferId2;			//colision del cubo central
 
+GLuint labVA,  labIndBufferId; 			//dibujado del laberinto
+GLuint labVA2, labIndBufferId2;			//colision del laberinto
+
+
+
+//Constantes y cosas asi
 #define RESET 0xFFFFFFFF
+typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
 
+//Informacion de la cámara
+static float rotationSpeed = 1;
+static MOTION_TYPE camaraDirection = IDLE;
+
+//Informacion y funciones del cubo base
 static void initShaders() {
 	GLuint vShader = compileShader("shaders/simple.vsh", GL_VERTEX_SHADER);
 	if(!shaderCompiled(vShader)) return;
@@ -59,34 +66,7 @@ static void initShaders() {
 	viewMatrixLoc2       = glGetUniformLocation(programId2, "viewMatrix");
 	projectionMatrixLoc2 = glGetUniformLocation(programId2, "projMatrix");
 	positionLoc2			= glGetUniformLocation(programId2, "position");
-
-	//HUB
-	vShader = compileShader("shaders/hub.vsh", GL_VERTEX_SHADER);
-	if(!shaderCompiled(vShader)) return;
-	fShader = compileShader("shaders/hub.fsh", GL_FRAGMENT_SHADER);
-	if(!shaderCompiled(fShader)) return;
-	programId3 = glCreateProgram();
-	glAttachShader(programId3, vShader);
-	glAttachShader(programId3, fShader);
-	glLinkProgram(programId3);
-
-
-	//Paredes
-	vShader = compileShader("shaders/simple.vsh", GL_VERTEX_SHADER);
-	if(!shaderCompiled(vShader)) return;
-	fShader = compileShader("shaders/simple.fsh", GL_FRAGMENT_SHADER);
-	if(!shaderCompiled(fShader)) return;
-	programId4 = glCreateProgram();
-	glAttachShader(programId4, vShader);
-	glAttachShader(programId4, fShader);
-	glLinkProgram(programId4);
-
-	vertexPositionLoc4   = glGetAttribLocation(programId4, "vertexPosition");
-	vertexColorLoc4 		= glGetAttribLocation(programId4, "vertexColor");
-	vertexNormalLoc4		= glGetAttribLocation(programId4, "vertexNormal");
-	modelMatrixLoc4      = glGetUniformLocation(programId4, "modelMatrix");
-	viewMatrixLoc4       = glGetUniformLocation(programId4, "viewMatrix");
-	projectionMatrixLoc4 = glGetUniformLocation(programId4, "projMatrix");
+	radiusLoc2			= glGetUniformLocation(programId2, "radius");
 }
 static const float CUBE_WIDTH = 20;
 static const float CUBE_HEIGHT = 20;
@@ -169,130 +149,245 @@ static void drawCube(GLuint VA, GLuint id){
 	glDrawElements(GL_TRIANGLE_FAN, 4*6+5, GL_UNSIGNED_INT, 0);
 }
 
-static const float CUBE_WIDTH2 = 2;
-static const float CUBE_HEIGHT2 = 2;
-static const float CUBE_DEPTH2 = 2;
 
-static void initParedes(){
-	float w1 = -CUBE_WIDTH2  / 2, w2 = CUBE_WIDTH2  / 2;
-		float h1 = -CUBE_HEIGHT2 / 2, h2 = CUBE_HEIGHT2 / 2;
-		float d1 = -CUBE_DEPTH2  / 2, d2 = CUBE_DEPTH2  / 2;
-		float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-				             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
-								w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
-								w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
-								w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
-								w1, h2, d2, 	w1, h2, d1, 	w2, h2, d1, 	w2, h2, d2   // Arriba
-		};
-		float colors[] = {  	1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-				1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-		};
-		GLuint indices[4*6+5];
-		int pos = 0;
-		for(int i = 0; i<6;i++){
-			for(int j = 0;j<4;j++){
-				indices[pos] = i*4+j;
-				pos++;
+//Informacion y funciones del laberinto
+
+typedef struct{
+	int size;
+	int**faces[6];
+	int*edge[12];
+	int vertex[8];
+
+}Laberinto;
+Laberinto laberinto;
+
+static void initLaberinto(){
+	//Apertura del archivo
+	FILE *archivo;
+	archivo = fopen("test.txt","r");
+	if(archivo == NULL){
+		printf("No se encontro el archivo, procedo con la muertacion");
+		exit(-1);
+	}
+	//Inicializacion del laberinto
+	Laberinto l;
+	fscanf(archivo, "%d",&l.size);
+	//Solicita el espacio de memoria para cada cara, arista
+	for(int face = 0; face< 6; face++){
+		l.faces[face] = (int**)malloc(sizeof(int*)*l.size);
+		for(int i = 0; i< l.size; i++)
+			l.faces[face][i] = (int*)malloc(sizeof(int)*l.size);
+
+	}
+	for(int i = 0; i< 12; i++)l.edge[i] = malloc(sizeof(int)*l.size);
+
+
+	//Se almacena en cada cara
+	for(int cara = 0; cara < 6; cara++)
+		for(int i = 0; i<l.size;i++)
+			for(int j = 0; j<l.size;j++)
+				fscanf(archivo, "%d",&l.faces[cara][i][j]);
+
+	//Se almacena cada arista
+	for(int arista = 0; arista <12; arista++)
+		for(int i = 0; i<l.size;i++)
+			fscanf(archivo, "%d",&l.edge[arista][i]);
+
+	//Se almacena cada vertice
+	for(int vertice = 0; vertice <8; vertice ++)
+		fscanf(archivo, "%d",&l.vertex[vertice]);
+
+	fclose(archivo);
+
+	//Se guardan en las variables globales
+	laberinto = l;
+
+}
+
+static void printLaberinto(){
+	Laberinto l = laberinto;
+	printf("Size: %d\n",l.size);
+
+	for(int face = 0; face< 6; face++){
+		printf("Cara %d\n",face);
+		for(int i = 0; i< l.size; i++){
+			for(int j = 0; j<l.size; j++){
+			printf("%d ",l.faces[face][i][j]);
 			}
-			if(i<5)indices[pos] = RESET;
+		printf("\n");
+		}
+	}
+
+	for(int arista = 0; arista <12; arista++){
+		printf("Arista %d\n",arista);
+		for(int i = 0; i<l.size;i++){
+			printf("%d ",l.edge[arista][i]);
+		}
+		printf("\n");
+	}
+	printf("Vertices:");
+	for(int vertex = 0; vertex<8; vertex++){
+		printf("%d ",l.vertex[vertex]);
+	}
+	printf("\n");
+
+}
+
+static void initPared(){
+
+	float width = CUBE_WIDTH/laberinto.size;
+	float height = CUBE_HEIGHT/laberinto.size;
+	float depth = CUBE_DEPTH/laberinto.size;
+	float w1 = -width  / 2, w2 = width  / 2;
+	float h1 = -height / 2, h2 = height / 2;
+	float d1 = -depth  / 2, d2 = depth  / 2;
+	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
+				        	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
+							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
+							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
+							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
+							w1, h2, d2, 	w1, h2, d1, 	w2, h2, d1, 	w2, h2, d2   // Arriba
+			};
+	float colors[] = {  	1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
+	};
+	GLuint indices[4*6+5];
+	int pos = 0;
+	for(int i = 0; i<6;i++){
+		for(int j = 0;j<4;j++){
+			indices[pos] = i*4+j;
 			pos++;
 		}
+		if(i<5)indices[pos] = RESET;
+		pos++;
+	}
 
-	for(int i = 0; i < paredes; i++) { //Cambiar variables
-			glUseProgram(programId4);
-			glGenVertexArrays(1, &cubeVA3[i]); //
-			glBindVertexArray(cubeVA3[i]);//
-			GLuint buffers[3];
-			glGenBuffers(3, buffers);
-
-			glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
-			glVertexAttribPointer(vertexPositionLoc4, 3, GL_FLOAT, 0, 0, 0);
-			glEnableVertexAttribArray(vertexPositionLoc4);
-
-			glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
-			glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
-			glVertexAttribPointer(vertexColorLoc4, 3, GL_FLOAT, 0, 0, 0);
-			glEnableVertexAttribArray(vertexColorLoc4);
-
-			cubeIndBufferId3[i] = buffers[2]; //
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
-			glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
-
-			glPrimitiveRestartIndex(RESET);
-			glEnable(GL_PRIMITIVE_RESTART);
-		}
-}
-
-static const float hubSize = 0.2;
-static const float hubColor = 1;
-
-static void initHub(){
-	float s = hubSize/2;
-	float h = hubColor;
-	float pos[] = {		-s,0,	s,0,	0,-s,	0,s};
-	float color[] = {	h,h,h,	h,h,h, 	h,h,h, 	h,h,h};
-
-	glUseProgram(programId3);
-	glGenVertexArrays(1, &miraVA);
-	glBindVertexArray(miraVA);
-	GLuint buffers[2];
-	glGenBuffers(2,buffers);
+	glUseProgram(programId1);
+	glGenVertexArrays(1, &labVA);
+	glBindVertexArray(labVA);
+	GLuint buffers[3];
+	glGenBuffers(3, buffers);
 
 	glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(pos), pos, GL_STATIC_DRAW);
-	glVertexAttribPointer(vertexPositionLoc3, 2, GL_FLOAT, 0, 0, 0);
-	glEnableVertexAttribArray(vertexPositionLoc3);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexPositionLoc, 3, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexPositionLoc);
 
 	glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(color), color, GL_STATIC_DRAW);
-	glVertexAttribPointer(vertexColorLoc3, 3, GL_FLOAT, 0, 0, 0);
-	glEnableVertexAttribArray(vertexColorLoc3);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexColorLoc, 3, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexColorLoc);
+
+	labIndBufferId = buffers[2];
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
+
+	glPrimitiveRestartIndex(RESET);
+	glEnable(GL_PRIMITIVE_RESTART);
+
+	glUseProgram(programId2);
+	glGenVertexArrays(1, &labVA2);
+	glBindVertexArray(labVA2);
+	GLuint buffers2[2];
+	glGenBuffers(2, buffers2);
+
+	glBindBuffer(GL_ARRAY_BUFFER, buffers2[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexPositionLoc2, 3, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexPositionLoc2);
+
+	labIndBufferId2 = buffers2[1];
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers2[1]);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
+
+	glPrimitiveRestartIndex(RESET);
+	glEnable(GL_PRIMITIVE_RESTART);
+}
+
+static void drawPared(GLuint VA, GLuint id){
+	glBindVertexArray(VA);
+	glBindBuffer(GL_ARRAY_BUFFER,id);
+	glDrawElements(GL_TRIANGLE_FAN, 4*6+5, GL_UNSIGNED_INT, 0);
+}
+
+static void drawLaberinto(GLuint VA, GLuint id){
+	glBindVertexArray(VA);
+	glBindBuffer(GL_ARRAY_BUFFER,id);
+
+	vec3 despColumna[] = 	{{1,0,0},{1,0,0}, {1,0,0}, {1,0,0}, {0,0,1}, {0,0,-1}};
+	vec3 despFila[]	=		{{0,1,0},{0,0,-1},{0,-1,0},{0,0,1}, {0,1,0}, {0,1,0}};
+	vec3 caras[]	 = 		{{0,0,1},{0,1,0}, {0,0,-1},{0,-1,0},{-1,0,0},{1,0,0}};
+
+	float despC = CUBE_WIDTH/2;
+	float desp = despC/laberinto.size;
+
+	for(int face = 0; face <6; face++){
+		mIdentity(&modelMatrix);
+		translate(&modelMatrix,(despC+desp)*caras[face][0],			(despC+desp)*caras[face][1],		(despC+desp)*caras[face][2]);
+		translate(&modelMatrix,(despC-desp)*despColumna[face][0]*-1,(despC-desp)*despColumna[face][1]*-1,(despC-desp)*despColumna[face][2]*-1);
+		translate(&modelMatrix,(despC-desp)*despFila[face][0],	(despC-desp)*despFila[face][1],	(despC-desp)*despFila[face][2]);
+		pushMatrix(&modelMatrix);
+		for(int i = 0; i<laberinto.size; i++){
+			popMatrix(&modelMatrix);
+			pushMatrix(&modelMatrix);
+			for(int j = 0; j<laberinto.size; j++){
+				if(laberinto.faces[face][i][j] == 1){
+					glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
+					drawPared(VA, id);
+				}
+				translate(&modelMatrix,despColumna[face][0]*desp*2,despColumna[face][1]*desp*2,despColumna[face][2]*desp*2);
+			}
+			popMatrix(&modelMatrix);
+			translate(&modelMatrix,despFila[face][0]*desp*-2,despFila[face][1]*desp*-2,despFila[face][2]*desp*-2);
+			pushMatrix(&modelMatrix);
+		}
+
+	}
+
 
 }
 
-static void drawHub(){
-	glUseProgram(programId3);
-	glBindVertexArray(miraVA);
-	glDrawArrays(GL_LINES,0,4);
-}
-
+//Informacion y funciones de la esfera
 Sphere sphere;
 
-static const float SPHERE_RADIUS  = 1;
+
 static const int   SPHERE_COLUMNS = 10;
 static const int   SPHERE_ROWS	  = 10;
 static const float SPHERE_RED	  = 0.8;
 static const float SPHERE_GREEN	  = 0.8;
 static const float SPHERE_BLUE	  = 0.8;
+static float sphereRadius;
 
-static void initSphere(){
-	vec3 color = {SPHERE_RED,SPHERE_GREEN,SPHERE_BLUE};
-	sphere = sphere_create(SPHERE_RADIUS, SPHERE_COLUMNS, SPHERE_ROWS, color);
-	glUseProgram(programId1);
-	sphere_bind(sphere, vertexPositionLoc, vertexColorLoc, vertexNormalLoc);
-}
-
-
-typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
-
-
-static float rotationSpeed = 1;
-static MOTION_TYPE camaraDirection = IDLE;
-
-//variables que almacena la posicion y señala el movimiento del objeto(esfera)
+//variables que almacena la posicion y señala el movimiento de la esfera
 
 static MOTION_TYPE sphereVerticalMove = IDLE;
 static MOTION_TYPE sphereHorizontalMove = IDLE;
 static const float SPHERE_SPEED = 0.5;
 static float sphereX = 0;
 static float sphereY = 0;
-static float sphereZ = CUBE_DEPTH/2+SPHERE_RADIUS;
+static float sphereZ; // = CUBE_DEPTH/2+SPHERE_RADIUS;
 vec3 position;
+
+static void initSphere(){
+
+	//Se asignan variables globales
+	sphereRadius = CUBE_WIDTH /laberinto.size*0.8/2;
+	sphereZ = CUBE_DEPTH/2+sphereRadius;
+
+	//Se crea y bindea la esfera
+	vec3 color = {SPHERE_RED,SPHERE_GREEN,SPHERE_BLUE};
+	sphere = sphere_create(sphereRadius, SPHERE_COLUMNS, SPHERE_ROWS, color);
+	glUseProgram(programId1);
+	sphere_bind(sphere, vertexPositionLoc, vertexColorLoc, vertexNormalLoc);
+
+	//Se envia el valor del radio para las colisiones
+	glUseProgram(programId2);
+	glUniform1f(radiusLoc2,sphereRadius);
+}
 
 
 // variables de rotaciones y de la cara visible
@@ -329,21 +424,20 @@ void moveAndCollisionFunc(){
 		moveVerticalSphere();
 		//Se debe de enviar la posicion de la esfera
 		glUniform3fv(positionLoc2, 1, position);
+		//Se dibuja el escenario
+		mIdentity(&modelMatrix);
+		glUniformMatrix4fv(modelMatrixLoc2, 1, true, modelMatrix.values);
+		drawLaberinto(labVA2,labIndBufferId2);
+		mIdentity(&modelMatrix);
+		glUniformMatrix4fv(modelMatrixLoc2, 1, true, modelMatrix.values);
 		drawCube(cubeVA2, cubeIndBufferId2);
-		/*
-				if (abs(sphereX) > (CUBE_WIDTH / 2 + SPHERE_RADIUS))
-			sphereX = (sphereX<0)?-(CUBE_WIDTH / 2 + SPHERE_RADIUS):(CUBE_WIDTH / 2 + SPHERE_RADIUS);
-		if (abs(sphereY) > (CUBE_HEIGHT / 2 + SPHERE_RADIUS))
-			sphereY = (sphereY<0)?-(CUBE_HEIGHT / 2 + SPHERE_RADIUS):(CUBE_HEIGHT / 2 + SPHERE_RADIUS);
-		if (abs(sphereZ) > (CUBE_DEPTH / 2 + SPHERE_RADIUS))
-			sphereZ = (sphereZ<0)?-(CUBE_DEPTH / 2 + SPHERE_RADIUS):(CUBE_DEPTH / 2 + SPHERE_RADIUS);
-		 */
+
 		int collision = 0;
-		if (abs(sphereX) > (CUBE_WIDTH / 2 + SPHERE_RADIUS))
+		if (abs(sphereX) > (CUBE_WIDTH / 2  + CUBE_WIDTH/laberinto.size/2))
 			collision = 1;
-		if (abs(sphereY) > (CUBE_HEIGHT / 2 + SPHERE_RADIUS))
+		if (abs(sphereY) > (CUBE_HEIGHT / 2 + CUBE_HEIGHT/laberinto.size/2))
 			collision = 1;
-		if (abs(sphereZ) > (CUBE_DEPTH / 2 + SPHERE_RADIUS))
+		if (abs(sphereZ) > (CUBE_DEPTH / 2  + CUBE_DEPTH/laberinto.size/2))
 			collision = 1;
 
 		int width = glutGet(GLUT_WINDOW_WIDTH);
@@ -362,11 +456,21 @@ void moveAndCollisionFunc(){
 		if (collision)returnVerticalSphere();
 	}
 
+
 	if (sphereHorizontalMove != IDLE) {
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		moveHorizontalSphere();
 		//Se debe de enviar la posicion de la esfera
 		glUniform3fv(positionLoc2, 1, position);
+		//Se dubuja el escenario
+		mIdentity(&modelMatrix);
+		glUniformMatrix4fv(modelMatrixLoc2, 1, true, modelMatrix.values);
+		drawLaberinto(labVA2,labIndBufferId2);
+		mIdentity(&modelMatrix);
+		glUniformMatrix4fv(modelMatrixLoc2, 1, true, modelMatrix.values);
 		drawCube(cubeVA2, cubeIndBufferId2);
+
+
 
 		int width = glutGet(GLUT_WINDOW_WIDTH);
 		int height = glutGet(GLUT_WINDOW_HEIGHT);
@@ -374,11 +478,11 @@ void moveAndCollisionFunc(){
 		glReadPixels(0, 0, width, height, GL_RGB, GL_FLOAT, pixels);
 
 		int collision = 0;
-		if (abs(sphereX) > (CUBE_WIDTH / 2 + SPHERE_RADIUS))
+		if (abs(sphereX) > (CUBE_WIDTH / 2  + CUBE_WIDTH/laberinto.size/2))
 			collision = 1;
-		if (abs(sphereY) > (CUBE_HEIGHT / 2 + SPHERE_RADIUS))
+		if (abs(sphereY) > (CUBE_HEIGHT / 2 + CUBE_HEIGHT/laberinto.size/2))
 			collision = 1;
-		if (abs(sphereZ) > (CUBE_DEPTH / 2 + SPHERE_RADIUS))
+		if (abs(sphereZ) > (CUBE_DEPTH / 2  + CUBE_DEPTH/laberinto.size/2))
 			collision = 1;
 		for (int i = 0; i < width * height * 3; i++) {
 			if (collision)
@@ -394,65 +498,10 @@ void moveAndCollisionFunc(){
 
 }
 
-static bool bandera = true;
-
-static float cubeX[110];
-static float cubeY[110];
-static float cubeZ[110];
 
 
-static void readTxtAndDraw() {
-	bool bandera2 = true;
 
-	int valor = -CUBE_WIDTH/2+CUBE_WIDTH2/2;
-	cubeX[0] = valor;
-	int valor2 = (CUBE_HEIGHT/2)-(CUBE_HEIGHT2/2);
-	cubeY[0] = valor2;
-	cubeZ[0] = CUBE_DEPTH/2+CUBE_DEPTH2/2;
-	 FILE *archivo;
-	   int c;
-	   int j = 0;
-
-	   archivo = fopen("test.txt","r");
-
-		   for(int i = 0; i < paredes; i++) {
-		      c = fgetc(archivo);
-		      if( feof(archivo) ) {
-		         break ;
-		      }
-
-		      if(c == '1'){
-		    	  if(bandera)printf("%c\n", c);
-
-			      mIdentity(&modelMatrix);
-			      translate(&modelMatrix,cubeX[i], cubeY[i], cubeZ[i]);
-			      glUniformMatrix4fv(modelMatrixLoc4, 1, true, modelMatrix.values);
-			      drawCube(cubeVA3[i], cubeIndBufferId3[i]);
-		      }
-
-		      if(c == ';'){
-		    	  if(bandera)printf("%c\n", c);
-		    	  j++;
-		    	  bandera2 = !bandera2;
-		    	  valor2 = cubeY[i] - CUBE_WIDTH2;
-		      }
-
-			      if(bandera2) {
-			    	  cubeX[i+1] = cubeX[i] + CUBE_WIDTH2;
-			      } else {
-			    	  cubeX[i+1] = cubeX[i] - CUBE_WIDTH2;
-			      }
-
-			      cubeY[i+1] = valor2;
-			      cubeZ[i] = CUBE_DEPTH/2+CUBE_DEPTH2/2;
-
-		   }
-		   bandera = false;
-	   fclose(archivo);
-
-
-}
-
+//funciones relacionadas con la vista
 
 static void rotateDirection();
 void viewFunc();
@@ -552,16 +601,13 @@ static void displayFunc() {
 	drawCube(cubeVA, cubeIndBufferId);
 
 	//SE DIBUJARAN LAS PAREDES
-	readTxtAndDraw();
+	drawLaberinto(labVA,labIndBufferId);
 
 	//Se dibuja la esfera
 	mIdentity(&modelMatrix);
 	translate(&modelMatrix,sphereX, sphereY, sphereZ);
 	glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
 	sphere_draw(sphere);
-
-	//Se dibuja el HUB
-	//drawHub();
 
 	glutSwapBuffers();
 }
@@ -668,19 +714,27 @@ int main(int argc, char **argv) {
     glutPassiveMotionFunc(mousePasiveMotionFunc); //este cuando no lo esta presionado
     glewInit();
     glEnable(GL_DEPTH_TEST);
-    //glutSetCursor(GLUT_CURSOR_NONE);		//te hace invisible el raton
-    //glutWarpPointer(glutGet(GLUT_WINDOW_WIDTH)/2.0,glutGet(GLUT_WINDOW_HEIGHT)/2.0); 	//te lo coloca en el centro de la pantalla (solo una vez, no lo mantiene alli)
     initShaders();
     mIdentity(&viewMatrix);
     initCube();
-    initParedes();
-    initHub();
+    initLaberinto();
+    printLaberinto();
+    initPared();
     initSphere();
     glClearColor(0.1, 0.1, 0.1, 1.0);
     glutMainLoop();
 
 	return 0;
 }
+
+
+
+
+
+
+
+
+
 int rotating = 0;
 void viewFunc(){
 	if(camaraDirection == IDLE)return;
@@ -1012,3 +1066,30 @@ static void rotateDirection(){
 	right.z = z?!neg_z?1:-1:0;
 	printf("Cara: %d Sub: %d,\t up<%.1f,%.1f,%.1f>, right<%.1f,%.1f,%.1f>\n",camaraFace,v,up.x,up.y,up.z,right.x,right.y,right.z);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

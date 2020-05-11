@@ -29,7 +29,7 @@ GLuint labVA2, labIndBufferId2;			//colision del laberinto
 #define RESET 0xFFFFFFFF
 typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
 
-//Informacion de la cÃ¡mara
+//Informacion de la cámara
 static float rotationSpeed = 1;
 static MOTION_TYPE camaraDirection = IDLE;
 
@@ -77,7 +77,7 @@ static void initCube(){
 	float h1 = -CUBE_HEIGHT / 2, h2 = CUBE_HEIGHT / 2;
 	float d1 = -CUBE_DEPTH  / 2, d2 = CUBE_DEPTH  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // AtrÃ¡s
+			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -242,7 +242,7 @@ static void initPared(){
 	float h1 = -height / 2, h2 = height / 2;
 	float d1 = -depth  / 2, d2 = depth  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-				        	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // AtrÃ¡s
+				        	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -325,6 +325,7 @@ static void drawLaberinto(GLuint VA, GLuint id){
 	float despC = CUBE_WIDTH/2;
 	float desp = despC/laberinto.size;
 
+	//Dibuja las caras
 	for(int face = 0; face <6; face++){
 		mIdentity(&modelMatrix);
 		translate(&modelMatrix,(despC+desp)*caras[face][0],			(despC+desp)*caras[face][1],		(despC+desp)*caras[face][2]);
@@ -349,6 +350,32 @@ static void drawLaberinto(GLuint VA, GLuint id){
 	}
 
 
+	loadIdentity(&modelMatrix);
+	//dibuja las aristas
+
+	vec3 edgePos[] = {{0,1,0},{1,0,0},{0,-1,0},{-1,0,0},{0,1,0},{-1,0,0},{0,-1,0},{1,0,0},{0,1,0},{0,-1,0},{0,1,0},{0,-1,0}};
+	vec3 edgeDesp[] ={{1,0,0},{0,-1,0},{-1,0,0},{0,1,0},{-1,0,0},{0,-1,0},{1,0,0},{0,1,0},{0,0,1},{0,0,1},{0,0,1},{0,0,1}};
+	for(int arista = 0; arista <12; arista++){
+		mIdentity(&modelMatrix);
+		if(arista < 4)		translate(&modelMatrix,0,0,(despC+desp));
+		else if(arista <8)	translate(&modelMatrix,0,0,-(despC+desp));
+		else if(arista<10)	translate(&modelMatrix,-(despC+desp),0,0);
+		else				translate(&modelMatrix,(despC+desp),0,0);
+
+		translate(&modelMatrix,edgePos[arista][0]*(despC+desp),edgePos[arista][1]*(despC+desp),edgePos[arista][2]*(despC+desp));
+		translate(&modelMatrix,-edgeDesp[arista][0]*(despC-desp),-edgeDesp[arista][1]*(despC-desp),-edgeDesp[arista][2]*(despC-desp));
+		for(int i = 0; i<laberinto.size;i++){
+			if(laberinto.edge[arista][i]){
+				glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
+				drawPared(VA, id);
+			}
+			translate(&modelMatrix,edgeDesp[arista][0]*desp*2,edgeDesp[arista][1]*desp*2,edgeDesp[arista][2]*desp*2);
+		}
+	}
+	loadIdentity(&modelMatrix);
+
+
+
 }
 
 //Informacion y funciones de la esfera
@@ -362,7 +389,7 @@ static const float SPHERE_GREEN	  = 0.8;
 static const float SPHERE_BLUE	  = 0.8;
 static float sphereRadius;
 
-//variables que almacena la posicion y seÃ±ala el movimiento de la esfera
+//variables que almacena la posicion y señala el movimiento de la esfera
 
 static MOTION_TYPE sphereVerticalMove = IDLE;
 static MOTION_TYPE sphereHorizontalMove = IDLE;
@@ -404,7 +431,7 @@ void moveAndCollisionFunc(){
 	glUseProgram(programId2);
 
 	//Se envia la informacion que no cambia
-	//Se envia matriz de proyecciÃ³n
+	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
 	//se envia matriz de vista
@@ -583,7 +610,7 @@ static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(programId1);
-	//Se envia matriz de proyecciÃ³n
+	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc, 1, true,projectionMatrix.values);
 
 	//se envia matriz de vista

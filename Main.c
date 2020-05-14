@@ -9,6 +9,7 @@
 #include "Vec4.h"
 #include "Vec3.h"
 #include "Sphere.h"
+#include <stdlib.h>
 
 
 #define toRadians(deg) deg * M_PI / 180.0
@@ -28,10 +29,6 @@ GLuint labVA2, labIndBufferId2;			//colision del laberinto
 //Constantes y cosas asi
 #define RESET 0xFFFFFFFF
 typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
-
-//Informacion de la cámara
-static float rotationSpeed = 1;
-static MOTION_TYPE camaraDirection = IDLE;
 
 //Informacion y funciones del cubo base
 static void initShaders() {
@@ -160,6 +157,7 @@ typedef struct{
 
 }Laberinto;
 Laberinto laberinto;
+int startX, startY,finalFace, finalX, finalY;
 
 static void initLaberinto(){
 	//Apertura del archivo
@@ -197,6 +195,14 @@ static void initLaberinto(){
 	for(int vertice = 0; vertice <8; vertice ++)
 		fscanf(archivo, "%d",&l.vertex[vertice]);
 
+	//Se almacena el punto inicial de la esfera
+	fscanf(archivo,"%d",&startX);
+	fscanf(archivo,"%d",&startY);
+
+	//Se almacena el punto final de la esfera
+	fscanf(archivo,"%d",&finalFace);
+	fscanf(archivo,"%d",&finalX);
+	fscanf(archivo,"%d",&finalY);
 	fclose(archivo);
 
 	//Se guardan en las variables globales
@@ -374,8 +380,19 @@ static void drawLaberinto(GLuint VA, GLuint id){
 	}
 	loadIdentity(&modelMatrix);
 
-
-
+	//Dibujar las esquinas del laberinto
+	for(int esquina = 0; esquina < 8; esquina++){
+		mIdentity(&modelMatrix);
+		if(esquina < 4)		translate(&modelMatrix,0,0,(despC+desp));
+		else translate(&modelMatrix,0,0,-(despC+desp));
+		translate(&modelMatrix, edgePos[esquina][0]*(despC+desp),  edgePos[esquina][1]*(despC+desp),  edgePos[esquina][2]*(despC+desp));
+		translate(&modelMatrix,-edgeDesp[esquina][0]*(despC+desp),-edgeDesp[esquina][1]*(despC+desp),-edgeDesp[esquina][2]*(despC+desp));
+		if(laberinto.vertex[esquina]){
+			glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
+			drawPared(VA, id);
+		}
+	}
+	loadIdentity(&modelMatrix);
 }
 
 //Informacion y funciones de la esfera
@@ -393,17 +410,20 @@ static float sphereRadius;
 
 static MOTION_TYPE sphereVerticalMove = IDLE;
 static MOTION_TYPE sphereHorizontalMove = IDLE;
-static const float SPHERE_SPEED = 0.5;
+static float sphereSpeed = 0.5;
 static float sphereX = 0;
 static float sphereY = 0;
 static float sphereZ; // = CUBE_DEPTH/2+SPHERE_RADIUS;
 vec3 position;
 
 static void initSphere(){
+	float desp = CUBE_WIDTH/laberinto.size;
 
 	//Se asignan variables globales
 	sphereRadius = CUBE_WIDTH /laberinto.size*0.8/2;
-	sphereZ = CUBE_DEPTH/2+sphereRadius;
+	sphereX = -(CUBE_DEPTH/2+desp/2)+desp*startX;
+	sphereY = (CUBE_DEPTH/2+desp/2)-desp*startY;
+	sphereZ = CUBE_DEPTH/2+desp/2;
 
 	//Se crea y bindea la esfera
 	vec3 color = {SPHERE_RED,SPHERE_GREEN,SPHERE_BLUE};
@@ -415,13 +435,21 @@ static void initSphere(){
 	glUseProgram(programId2);
 	glUniform1f(radiusLoc2,sphereRadius);
 }
-
+//Informacion de la cámara
+static float rotationSpeed = 1;
+static MOTION_TYPE camaraDirection = IDLE;
 
 // variables de rotaciones y de la cara visible
 Vec4 up = {1,0,0,0};
 Vec4 right ={0,1,0,0};
 int camaraFace = 0;
 MOTION_TYPE camaraLad = DOWN;
+static float const CAMARA_DISTANCE = 50;
+
+//Valores del raton
+bool leftClick = false;
+bool rightClick = false;
+bool midleClick = false;
 
 void moveVerticalSphere();
 void moveHorizontalSphere();
@@ -435,9 +463,7 @@ void moveAndCollisionFunc(){
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
 	//se envia matriz de vista
-	translate(&viewMatrix, 0, 0, -40);
 	glUniformMatrix4fv(viewMatrixLoc2, 1, true, viewMatrix.values);
-	translate(&viewMatrix, 0, 0, 40);
 
 	//Se envia matriz de modelo
 
@@ -533,18 +559,19 @@ void moveAndCollisionFunc(){
 static void rotateDirection();
 void viewFunc();
 
+//Funciones de movimiento de la esfera
 void moveVerticalSphere(){
 
 	if(camaraDirection != IDLE)return;
 	if(sphereVerticalMove == UP){
-		sphereX += SPHERE_SPEED*right.x;
-		sphereY += SPHERE_SPEED*right.y;
-		sphereZ += SPHERE_SPEED*right.z;
+		sphereX += sphereSpeed*right.x;
+		sphereY += sphereSpeed*right.y;
+		sphereZ += sphereSpeed*right.z;
 	}
 	else if(sphereVerticalMove == DOWN){
-		sphereX -= SPHERE_SPEED*right.x;
-		sphereY -= SPHERE_SPEED*right.y;
-		sphereZ -= SPHERE_SPEED*right.z;
+		sphereX -= sphereSpeed*right.x;
+		sphereY -= sphereSpeed*right.y;
+		sphereZ -= sphereSpeed*right.z;
 	}
 	position[0] = sphereX;
 	position[1] = sphereY;
@@ -554,14 +581,14 @@ void moveVerticalSphere(){
 void moveHorizontalSphere(){
 	if(camaraDirection != IDLE)return;
 	if(sphereHorizontalMove == RIGHT){
-		sphereX += SPHERE_SPEED*up.x;
-		sphereY += SPHERE_SPEED*up.y;
-		sphereZ += SPHERE_SPEED*up.z;
+		sphereX += sphereSpeed*up.x;
+		sphereY += sphereSpeed*up.y;
+		sphereZ += sphereSpeed*up.z;
 	}
 	else if(sphereHorizontalMove == LEFT){
-		sphereX -= SPHERE_SPEED*up.x;
-		sphereY -= SPHERE_SPEED*up.y;
-		sphereZ -= SPHERE_SPEED*up.z;
+		sphereX -= sphereSpeed*up.x;
+		sphereY -= sphereSpeed*up.y;
+		sphereZ -= sphereSpeed*up.z;
 	}
 	position[0] = sphereX;
 	position[1] = sphereY;
@@ -570,14 +597,14 @@ void moveHorizontalSphere(){
 
 void returnHorizontalSphere(){
 	if(sphereHorizontalMove == LEFT){
-		sphereX += SPHERE_SPEED*up.x;
-		sphereY += SPHERE_SPEED*up.y;
-		sphereZ += SPHERE_SPEED*up.z;
+		sphereX += sphereSpeed*up.x;
+		sphereY += sphereSpeed*up.y;
+		sphereZ += sphereSpeed*up.z;
 	}
 	else if(sphereHorizontalMove == RIGHT){
-		sphereX -= SPHERE_SPEED*up.x;
-		sphereY -= SPHERE_SPEED*up.y;
-		sphereZ -= SPHERE_SPEED*up.z;
+		sphereX -= sphereSpeed*up.x;
+		sphereY -= sphereSpeed*up.y;
+		sphereZ -= sphereSpeed*up.z;
 	}
 	position[0] = sphereX;
 	position[1] = sphereY;
@@ -586,19 +613,20 @@ void returnHorizontalSphere(){
 
 void returnVerticalSphere(){
 	if(sphereVerticalMove == DOWN){
-		sphereX += SPHERE_SPEED*right.x;
-		sphereY += SPHERE_SPEED*right.y;
-		sphereZ += SPHERE_SPEED*right.z;
+		sphereX += sphereSpeed*right.x;
+		sphereY += sphereSpeed*right.y;
+		sphereZ += sphereSpeed*right.z;
 	}
 	else if(sphereVerticalMove == UP){
-		sphereX -= SPHERE_SPEED*right.x;
-		sphereY -= SPHERE_SPEED*right.y;
-		sphereZ -= SPHERE_SPEED*right.z;
+		sphereX -= sphereSpeed*right.x;
+		sphereY -= sphereSpeed*right.y;
+		sphereZ -= sphereSpeed*right.z;
 	}
 	position[0] = sphereX;
 	position[1] = sphereY;
 	position[2] = sphereZ;
 }
+
 
 static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -614,12 +642,10 @@ static void displayFunc() {
 	glUniformMatrix4fv(projectionMatrixLoc, 1, true,projectionMatrix.values);
 
 	//se envia matriz de vista
-	translate(&viewMatrix, 0, 0, -40);
 
 	//Se actualiza la rotacion de la matriz
 	viewFunc();
 	glUniformMatrix4fv(viewMatrixLoc, 1, true, viewMatrix.values);
-	translate(&viewMatrix, 0, 0, 40);
 
 	//Se envia matriz de modelo
 	mIdentity(&modelMatrix);
@@ -721,6 +747,14 @@ static void mouseMotionFunc(int x, int y){
 		}
 	}
 }
+static void mouseFunc(int button, int state, int x, int y){
+	printf("%d",button);
+	switch(button){
+	case 0:leftClick = (state == GLUT_DOWN)?true:false;break;
+	case 1:midleClick = (state == GLUT_UP)?true:false;break;
+	case 2:rightClick = (state == GLUT_UP)?true:false;break;
+	}
+}
 
 
 int main(int argc, char **argv) {
@@ -736,13 +770,14 @@ int main(int argc, char **argv) {
     glutKeyboardUpFunc(keyReleasedFunc);
     glutSpecialFunc(specialKeyPressedFunc);
     glutSpecialUpFunc(specialKeyReleasedFunc);
-    //glutMouseFunc(mouseFunc);				//este te dice cuando hubo un cambio en los botones del raton
+    glutMouseFunc(mouseFunc);				//este te dice cuando hubo un cambio en los botones del raton
     glutMotionFunc(mouseMotionFunc);		//detecta la posicion del raton cuando esta el clic presionado
     glutPassiveMotionFunc(mousePasiveMotionFunc); //este cuando no lo esta presionado
     glewInit();
     glEnable(GL_DEPTH_TEST);
     initShaders();
     mIdentity(&viewMatrix);
+    translate(&viewMatrix, 0, 0, -CAMARA_DISTANCE);
     initCube();
     initLaberinto();
     printLaberinto();
@@ -764,7 +799,7 @@ int main(int argc, char **argv) {
 
 int rotating = 0;
 void viewFunc(){
-	if(camaraDirection == IDLE)return;
+	if(camaraDirection == IDLE || (!leftClick && !rotating))return;
 
 	rotating = (int)(rotating + rotationSpeed)%90;
 	switch(camaraDirection){

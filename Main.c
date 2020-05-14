@@ -15,7 +15,7 @@
 #define toRadians(deg) deg * M_PI / 180.0
 
 static Mat4   modelMatrix, projectionMatrix, viewMatrix;
-static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc; //dibujado
+static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, vertexTexcoordLoc,  modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc; //dibujado
 static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2, radiusLoc2; //colision
 
 GLuint cubeVA, cubeIndBufferId; 			//dibujado de cubo central
@@ -44,6 +44,7 @@ static void initShaders() {
 	vertexPositionLoc   = glGetAttribLocation(programId1, "vertexPosition");
 	vertexColorLoc 		= glGetAttribLocation(programId1, "vertexColor");
 	vertexNormalLoc		= glGetAttribLocation(programId1, "vertexNormal");
+	vertexTexcoordLoc   = glGetAttribLocation(programId1, "vertexTexcoord");
 	modelMatrixLoc      = glGetUniformLocation(programId1, "modelMatrix");
 	viewMatrixLoc       = glGetUniformLocation(programId1, "viewMatrix");
 	projectionMatrixLoc = glGetUniformLocation(programId1, "projMatrix");
@@ -87,6 +88,15 @@ static void initCube(){
 							0,1,1,	0,1,1,	0,1,1,	0,1,1,
 							1,0,1,	1,0,1,	1,0,1,	1,0,1
 	};
+	float wh = (float) CUBE_WIDTH / CUBE_HEIGHT;
+	float dh = (float) CUBE_DEPTH / CUBE_HEIGHT;
+	float texcoords[] = {   0, 2,			0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,	0, 2,
+				           	2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2,
+						    0, 2,       	0, 0,  		2 * dh, 0,   2 * dh, 0,   2 * dh, 2,    0, 2,
+							2 * dh, 2,  	2 * dh, 0,  0, 0,        0, 0,        0, 2,  		2 * dh, 2,
+							0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,    0, 2,
+							2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2
+	};
 	GLuint indices[4*6+5];
 	int pos = 0;
 	for(int i = 0; i<6;i++){
@@ -97,11 +107,12 @@ static void initCube(){
 		if(i<5)indices[pos] = RESET;
 		pos++;
 	}
+	//Bindeo para dibujo
 	glUseProgram(programId1);
 	glGenVertexArrays(1, &cubeVA);
 	glBindVertexArray(cubeVA);
-	GLuint buffers[3];
-	glGenBuffers(3, buffers);
+	GLuint buffers[4];
+	glGenBuffers(4, buffers);
 
 	glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
@@ -117,9 +128,16 @@ static void initCube(){
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
 
+	glBindBuffer(GL_ARRAY_BUFFER, buffers[3]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texcoords), texcoords, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexTexcoordLoc, 2, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexTexcoordLoc);
+
 	glPrimitiveRestartIndex(RESET);
 	glEnable(GL_PRIMITIVE_RESTART);
 
+
+	//Bindeo para colisiones
 	glUseProgram(programId2);
 	glGenVertexArrays(1, &cubeVA2);
 	glBindVertexArray(cubeVA2);

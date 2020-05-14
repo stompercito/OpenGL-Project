@@ -279,6 +279,15 @@ static void initPared(){
 								0,1,1,	0,1,1,	0,1,1,	0,1,1,
 								1,0,1,	1,0,1,	1,0,1,	1,0,1
 		};
+	float wh = (float) width / height;
+	float dh = (float) depth / height;
+	float texcoords[] = {   0, 2,			0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,	0, 2,
+				           	2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2,
+						    0, 2,       	0, 0,  		2 * dh, 0,   2 * dh, 0,   2 * dh, 2,    0, 2,
+							2 * dh, 2,  	2 * dh, 0,  0, 0,        0, 0,        0, 2,  		2 * dh, 2,
+							0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,    0, 2,
+							2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2
+	};
 
 	GLuint indices[4*6+5];
 	int pos = 0;
@@ -291,10 +300,11 @@ static void initPared(){
 		pos++;
 	}
 
+	//Bindeo para dibujo
 	glUseProgram(programId1);
 	glGenVertexArrays(1, &labVA);
 	glBindVertexArray(labVA);
-	GLuint buffers[3];
+	GLuint buffers[4];
 	glGenBuffers(3, buffers);
 
 	glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
@@ -311,9 +321,15 @@ static void initPared(){
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
 
+	glBindBuffer(GL_ARRAY_BUFFER, buffers[3]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texcoords), texcoords, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexTexcoordLoc, 2, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexTexcoordLoc);
+
 	glPrimitiveRestartIndex(RESET);
 	glEnable(GL_PRIMITIVE_RESTART);
 
+	//Bundeo para colision
 	glUseProgram(programId2);
 	glGenVertexArrays(1, &labVA2);
 	glBindVertexArray(labVA2);

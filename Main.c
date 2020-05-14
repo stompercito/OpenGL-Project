@@ -207,37 +207,36 @@ static void initLaberinto(){
 
 	//Se guardan en las variables globales
 	laberinto = l;
-
 }
-
-static void printLaberinto(){
-	Laberinto l = laberinto;
-	printf("Size: %d\n",l.size);
-
-	for(int face = 0; face< 6; face++){
-		printf("Cara %d\n",face);
-		for(int i = 0; i< l.size; i++){
-			for(int j = 0; j<l.size; j++){
-			printf("%d ",l.faces[face][i][j]);
-			}
-		printf("\n");
-		}
-	}
-
-	for(int arista = 0; arista <12; arista++){
-		printf("Arista %d\n",arista);
-		for(int i = 0; i<l.size;i++){
-			printf("%d ",l.edge[arista][i]);
-		}
-		printf("\n");
-	}
-	printf("Vertices:");
-	for(int vertex = 0; vertex<8; vertex++){
-		printf("%d ",l.vertex[vertex]);
-	}
-	printf("\n");
-
-}
+//
+//static void printLaberinto(){
+//	Laberinto l = laberinto;
+//	printf("Size: %d\n",l.size);
+//
+//	for(int face = 0; face< 6; face++){
+//		printf("Cara %d\n",face);
+//		for(int i = 0; i< l.size; i++){
+//			for(int j = 0; j<l.size; j++){
+//			printf("%d ",l.faces[face][i][j]);
+//			}
+//		printf("\n");
+//		}
+//	}
+//
+//	for(int arista = 0; arista <12; arista++){
+//		printf("Arista %d\n",arista);
+//		for(int i = 0; i<l.size;i++){
+//			printf("%d ",l.edge[arista][i]);
+//		}
+//		printf("\n");
+//	}
+//	printf("Vertices:");
+//	for(int vertex = 0; vertex<8; vertex++){
+//		printf("%d ",l.vertex[vertex]);
+//	}
+//	printf("\n");
+//
+//}
 
 static void initPared(){
 
@@ -254,13 +253,15 @@ static void initPared(){
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
 							w1, h2, d2, 	w1, h2, d1, 	w2, h2, d1, 	w2, h2, d2   // Arriba
 			};
-	float colors[] = {  	1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-							1,1,1,	1,1,1,	1,1,1, 	1,1,1,
-	};
+
+	float colors[] = {  	0,0,1,	0,0,1,	0,0,1, 	0,0,1,
+								0,1,0,	0,1,0,	0,1,0,	0,1,0,
+								1,0,0,	1,0,0,	1,0,0,	1,0,0,
+								1,1,0,	1,1,0,	1,1,0,	1,1,0,
+								0,1,1,	0,1,1,	0,1,1,	0,1,1,
+								1,0,1,	1,0,1,	1,0,1,	1,0,1
+		};
+
 	GLuint indices[4*6+5];
 	int pos = 0;
 	for(int i = 0; i<6;i++){
@@ -312,6 +313,19 @@ static void initPared(){
 
 	glPrimitiveRestartIndex(RESET);
 	glEnable(GL_PRIMITIVE_RESTART);
+}
+
+vec3 finalPoint;
+static void initFinalPoint(){
+	float desp = CUBE_WIDTH/laberinto.size;
+	vec3 right[] = 	{{1,0,0},{1,0,0}, {1,0,0}, {1,0,0}, {0,0,1}, {0,0,-1}};
+	vec3 up[]	=	{{0,1,0},{0,0,-1},{0,-1,0},{0,0,1}, {0,1,0}, {0,1,0}};
+			finalPoint[0] = up[finalFace][0]*((CUBE_DEPTH/2+desp/2)-finalY*desp)+right[finalFace][0]*((CUBE_DEPTH/2+desp/2)+finalX*desp);
+			finalPoint[1] = up[finalFace][1]*((CUBE_DEPTH/2+desp/2)-finalY*desp)+right[finalFace][1]*((CUBE_DEPTH/2+desp/2)+finalX*desp);
+			finalPoint[2] = up[finalFace][2]*((CUBE_DEPTH/2+desp/2)-finalY*desp)+right[finalFace][2]*((CUBE_DEPTH/2+desp/2)+finalX*desp);
+			finalPoint[0] = (finalFace == 5)?CUBE_DEPTH/2+desp/2:(finalFace == 4)?-(CUBE_DEPTH/2+desp/2):0;
+			finalPoint[1] = (finalFace == 1)?CUBE_DEPTH/2+desp/2:(finalFace == 3)?-(CUBE_DEPTH/2+desp/2):0;
+			finalPoint[2] = (finalFace == 0)?CUBE_DEPTH/2+desp/2:(finalFace == 2)?-(CUBE_DEPTH/2+desp/2):0;
 }
 
 static void drawPared(GLuint VA, GLuint id){
@@ -395,7 +409,9 @@ static void drawLaberinto(GLuint VA, GLuint id){
 	loadIdentity(&modelMatrix);
 }
 
-//Informacion y funciones de la esfera
+
+
+//Informacion interna de la esfera
 Sphere sphere;
 
 
@@ -627,7 +643,11 @@ void returnVerticalSphere(){
 	position[2] = sphereZ;
 }
 
+double distanceToFinalPoint(){
+	return sqrt(pow(sphereX-finalPoint[0],2)+pow(sphereY-finalPoint[1],2)+pow(sphereZ-finalPoint[2],2));
+}
 
+//Funciones generales
 static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -675,6 +695,9 @@ static void reshapeFunc(int w, int h) {
 static void timerFunc(int id) {
 	glutTimerFunc(10, timerFunc, id);
 	glutPostRedisplay();
+	if(distanceToFinalPoint() < sphereRadius*0.5){
+		exit(0);
+	}
 }
 
 static void specialKeyReleasedFunc(int key,int x, int y) {
@@ -731,7 +754,7 @@ static void mousePasiveMotionFunc(int x, int y){
 
 }
 static void mouseMotionFunc(int x, int y){
-	if(camaraDirection != IDLE)return;
+	if(camaraDirection != IDLE || !leftClick)return;
 	float disX = (abs(x - clicX))/(float)glutGet(GLUT_WINDOW_WIDTH);
 	float disY = (abs(y - clicY))/(float)glutGet(GLUT_WINDOW_HEIGHT);
 	if(disX > disY){
@@ -748,12 +771,22 @@ static void mouseMotionFunc(int x, int y){
 	}
 }
 static void mouseFunc(int button, int state, int x, int y){
-	printf("%d",button);
 	switch(button){
 	case 0:leftClick = (state == GLUT_DOWN)?true:false;break;
-	case 1:midleClick = (state == GLUT_UP)?true:false;break;
-	case 2:rightClick = (state == GLUT_UP)?true:false;break;
+	//case 1:midleClick = (state == GLUT_UP)?true:false;break;
+	//case 2:rightClick = (state == GLUT_UP)?true:false;break;
 	}
+}
+
+void init(){
+    initShaders();
+    mIdentity(&viewMatrix);
+    translate(&viewMatrix, 0, 0, -CAMARA_DISTANCE);
+    initCube();
+    initLaberinto();
+    initPared();
+    initSphere();
+    initFinalPoint();
 }
 
 
@@ -775,14 +808,7 @@ int main(int argc, char **argv) {
     glutPassiveMotionFunc(mousePasiveMotionFunc); //este cuando no lo esta presionado
     glewInit();
     glEnable(GL_DEPTH_TEST);
-    initShaders();
-    mIdentity(&viewMatrix);
-    translate(&viewMatrix, 0, 0, -CAMARA_DISTANCE);
-    initCube();
-    initLaberinto();
-    printLaberinto();
-    initPared();
-    initSphere();
+    init();
     glClearColor(0.1, 0.1, 0.1, 1.0);
     glutMainLoop();
 
@@ -1126,7 +1152,7 @@ static void rotateDirection(){
 	right.x = x?!neg_x?1:-1:0;
 	right.y = y?!neg_y?1:-1:0;
 	right.z = z?!neg_z?1:-1:0;
-	printf("Cara: %d Sub: %d,\t up<%.1f,%.1f,%.1f>, right<%.1f,%.1f,%.1f>\n",camaraFace,v,up.x,up.y,up.z,right.x,right.y,right.z);
+	//printf("Cara: %d Sub: %d,\t up<%.1f,%.1f,%.1f>, right<%.1f,%.1f,%.1f>\n",camaraFace,v,up.x,up.y,up.z,right.x,right.y,right.z);
 }
 
 

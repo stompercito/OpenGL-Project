@@ -24,6 +24,8 @@ GLuint cubeVA2, cubeIndBufferId2;			//colision del cubo central
 GLuint labVA,  labIndBufferId; 			//dibujado del laberinto
 GLuint labVA2, labIndBufferId2;			//colision del laberinto
 
+GLuint tex; //textura 1 (grass)
+
 
 
 //Constantes y cosas asi
@@ -75,7 +77,7 @@ static void initCube(){
 	float h1 = -CUBE_HEIGHT / 2, h2 = CUBE_HEIGHT / 2;
 	float d1 = -CUBE_DEPTH  / 2, d2 = CUBE_DEPTH  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
+			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // AtrÃ¡s
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -90,13 +92,14 @@ static void initCube(){
 	};
 	float wh = (float) CUBE_WIDTH / CUBE_HEIGHT;
 	float dh = (float) CUBE_DEPTH / CUBE_HEIGHT;
-	float texcoords[] = {   0, 2,			0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,	0, 2,
-				           	2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2,
-						    0, 2,       	0, 0,  		2 * dh, 0,   2 * dh, 0,   2 * dh, 2,    0, 2,
-							2 * dh, 2,  	2 * dh, 0,  0, 0,        0, 0,        0, 2,  		2 * dh, 2,
-							0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,    0, 2,
-							2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2
-	};
+	float texcoords[] = {   0, 2,			0, 0,  		2 * wh, 0,    2 * wh, 2,
+					           	2 * wh, 2,  	2 * wh, 0,  0, 0,     0, 2,
+							    0, 2,       	0, 0,  		2 * dh, 0,  2 * dh, 2,
+								2 * dh, 2,  	2 * dh, 0,  0, 0,     0, 2,
+								0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 2,
+								2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 2,
+		};
+
 	GLuint indices[4*6+5];
 	int pos = 0;
 	for(int i = 0; i<6;i++){
@@ -151,6 +154,7 @@ static void initCube(){
 
 	cubeIndBufferId2 = buffers2[1];
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers2[1]);
+
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
 
 	glPrimitiveRestartIndex(RESET);
@@ -265,7 +269,7 @@ static void initPared(){
 	float h1 = -height / 2, h2 = height / 2;
 	float d1 = -depth  / 2, d2 = depth  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-				        	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
+				        	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // AtrÃ¡s
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -281,12 +285,12 @@ static void initPared(){
 		};
 	float wh = (float) width / height;
 	float dh = (float) depth / height;
-	float texcoords[] = {   0, 2,			0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,	0, 2,
-				           	2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2,
-						    0, 2,       	0, 0,  		2 * dh, 0,   2 * dh, 0,   2 * dh, 2,    0, 2,
-							2 * dh, 2,  	2 * dh, 0,  0, 0,        0, 0,        0, 2,  		2 * dh, 2,
-							0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 0,   2 * wh, 2,    0, 2,
-							2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 0,        0, 2,  		2 * wh, 2
+	float texcoords[] = {   0, 2,			0, 0,  		2 * wh, 0,    2 * wh, 2,
+				           	2 * wh, 2,  	2 * wh, 0,  0, 0,     0, 2,
+						    0, 2,       	0, 0,  		2 * dh, 0,  2 * dh, 2,
+							2 * dh, 2,  	2 * dh, 0,  0, 0,     0, 2,
+							0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 2,
+							2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 2,
 	};
 
 	GLuint indices[4*6+5];
@@ -360,6 +364,25 @@ static void initFinalPoint(){
 			finalPoint[0] = (finalFace == 5)?CUBE_DEPTH/2+desp/2:(finalFace == 4)?-(CUBE_DEPTH/2+desp/2):0;
 			finalPoint[1] = (finalFace == 1)?CUBE_DEPTH/2+desp/2:(finalFace == 3)?-(CUBE_DEPTH/2+desp/2):0;
 			finalPoint[2] = (finalFace == 0)?CUBE_DEPTH/2+desp/2:(finalFace == 2)?-(CUBE_DEPTH/2+desp/2):0;
+}
+
+//Carga la textura.
+static GLuint initTextures(const char *filename, GLint min_mag_filt, GLint wrap_mode)
+{
+	unsigned char *data;
+	unsigned int width, height;
+	GLuint texture;
+
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		loadBMP(filename, &data, &width, &height);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_BGR, GL_UNSIGNED_BYTE, data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	return texture;
 }
 
 static void drawPared(GLuint VA, GLuint id){
@@ -456,7 +479,7 @@ static const float SPHERE_GREEN	  = 0.8;
 static const float SPHERE_BLUE	  = 0.8;
 static float sphereRadius;
 
-//variables que almacena la posicion y señala el movimiento de la esfera
+//variables que almacena la posicion y seÃ±ala el movimiento de la esfera
 
 static MOTION_TYPE sphereVerticalMove = IDLE;
 static MOTION_TYPE sphereHorizontalMove = IDLE;
@@ -485,7 +508,7 @@ static void initSphere(){
 	glUseProgram(programId2);
 	glUniform1f(radiusLoc2,sphereRadius);
 }
-//Informacion de la cámara
+//Informacion de la cÃ¡mara
 static float rotationSpeed = 1;
 static MOTION_TYPE camaraDirection = IDLE;
 
@@ -509,7 +532,7 @@ void moveAndCollisionFunc(){
 	glUseProgram(programId2);
 
 	//Se envia la informacion que no cambia
-	//Se envia matriz de proyección
+	//Se envia matriz de proyecciÃ³n
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
 	//se envia matriz de vista
@@ -692,7 +715,7 @@ static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(programId1);
-	//Se envia matriz de proyección
+	//Se envia matriz de proyecciÃ³n
 	glUniformMatrix4fv(projectionMatrixLoc, 1, true,projectionMatrix.values);
 
 	//se envia matriz de vista
@@ -816,6 +839,7 @@ void init(){
     initShaders();
     mIdentity(&viewMatrix);
     translate(&viewMatrix, 0, 0, -CAMARA_DISTANCE);
+    tex = initTextures("textures/Brick.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
     initCube();
     initLaberinto();
     initPared();

@@ -12,11 +12,10 @@
 #include <stdlib.h>
 
 
-#define toRadians(deg) deg * M_PI / 180.0
 
-static Mat4   modelMatrix, projectionMatrix, viewMatrix;
-static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, vertexTexcoordLoc,  modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc; //dibujado
-static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2, radiusLoc2; //colision
+static Mat4   modelMatrix, projectionMatrix, viewMatrix, distanceMatrix, distanceColisionMatrix;
+static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, vertexTexcoordLoc,  modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc, distanceMatrixLoc; //dibujado
+static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2, radiusLoc2,distanceMatrixLoc2; //colision
 
 GLuint cubeVA, cubeIndBufferId; 			//dibujado de cubo central
 GLuint cubeVA2, cubeIndBufferId2;			//colision del cubo central
@@ -24,19 +23,108 @@ GLuint cubeVA2, cubeIndBufferId2;			//colision del cubo central
 GLuint labVA,  labIndBufferId; 			//dibujado del laberinto
 GLuint labVA2, labIndBufferId2;			//colision del laberinto
 
-GLuint tex; //textura 1 (grass)
+GLuint lightCubeVA, lightCubeIndBufferId; 			//dibujado de cubo de luz
+
+GLuint glass; //textura 1 (grass)
 
 
+static GLuint whichDrawLoc;
+static int whichDraw = 0;
+static const float clearColor[] = {0.0,0,0,1};
 
-//Constantes y cosas asi
+
+//Iluminacion
+static GLuint lightsBufferId;
+
+static GLuint ambientLightLoc, materialALoc, materialDLoc;
+static GLuint materialSLoc, cameraPositionLoc;
+
+static vec3 ambientLight  = {0, 0, 0};
+
+static vec3 materialA     = {0.8, 0.8, 0.8};
+static vec3 materialD     = {0.3, 0.3, 0.3};
+static vec3 materialS     = {0.6, 0.6, 0.6};
+							//color	 //algo		//posicion		//algo		direccion	algo
+static float lights[]   = { 1, 1, 1,  0,   		0, 0, 0,  		1,	 		0, 0, 1,   0,		// Luz de la esfera
+							1, 1, 0,  0,   		0, 0, 0,  		128,	 	0, 0, -1,  0,
+};
+
 #define RESET 0xFFFFFFFF
+
 typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
+vec3 position;
+
+//Informacion de la cámara
+static float rotationSpeed = 1;
+static MOTION_TYPE camaraDirection = IDLE;
+
+// variables de rotaciones y de la cara visible
+Vec4 up = {1,0,0,0};
+Vec4 right ={0,1,0,0};
+int camaraFace = 0;
+MOTION_TYPE camaraLad = DOWN;
+static float const MIN_CAMARA_DISTANCE = 50;
+static float const MAX_CAMARA_DISTANCE = 150;
+static float const CAMARA_CHANGE = 1;
+static float camaraDistance = 100;
+
+static const float CUBE_WIDTH = 40;
+static const float CUBE_HEIGHT = 40;
+static const float CUBE_DEPTH = 40;
+
+//Valores del raton
+static int clicX, clicY;
+bool leftClick = false;
+bool rightClick = false;
+bool midleClick = false;
+
+//Valores del Laberinto
+
+typedef struct{
+	int size;
+	int**faces[6];
+	int*edge[12];
+	int vertex[8];
+
+}Laberinto;
+Laberinto laberinto;
+
+
+//Valores del punto final
+vec3 finalPoint;
+static float 	finalPointCubeAngle,
+				finalPointCubeRotationX,
+				finalPointCubeRotationY,
+				finalPointCubeRotationZ,
+				finalPointCubeSize;
+
+static float const 	LIGHTCUBE_SCALECHANGE = 0.01,
+					LIGHTCUBE_XCHANGE = 1,
+					LIGHTCUBE_YCHANGE = 1,
+					LIGHTCUBE_ZCHANGE = 1;
+
+
+//Informacion interna de la esfera
+Sphere sphere;
+static const int   SPHERE_COLUMNS = 10;
+static const int   SPHERE_ROWS	  = 10;
+static const float SPHERE_RED	  = 0.8;
+static const float SPHERE_GREEN	  = 0.8;
+static const float SPHERE_BLUE	  = 0.8;
+static float sphereRadius;
+
+//variables que almacena la posicion y señala el movimiento de la esfera
+
+static MOTION_TYPE sphereVerticalMove = IDLE;
+static MOTION_TYPE sphereHorizontalMove = IDLE;
+static float sphereSpeed,
+			sphereX,sphereY,sphereZ;
 
 //Informacion y funciones del cubo base
 static void initShaders() {
-	GLuint vShader = compileShader("shaders/simple.vsh", GL_VERTEX_SHADER);
+	GLuint vShader = compileShader("shaders/phong.vsh", GL_VERTEX_SHADER);
 	if(!shaderCompiled(vShader)) return;
-	GLuint fShader = compileShader("shaders/simple.fsh", GL_FRAGMENT_SHADER);
+	GLuint fShader = compileShader("shaders/phong.fsh", GL_FRAGMENT_SHADER);
 	if(!shaderCompiled(fShader)) return;
 	programId1 = glCreateProgram();
 	glAttachShader(programId1, vShader);
@@ -47,9 +135,18 @@ static void initShaders() {
 	vertexColorLoc 		= glGetAttribLocation(programId1, "vertexColor");
 	vertexNormalLoc		= glGetAttribLocation(programId1, "vertexNormal");
 	vertexTexcoordLoc   = glGetAttribLocation(programId1, "vertexTexcoord");
+
 	modelMatrixLoc      = glGetUniformLocation(programId1, "modelMatrix");
 	viewMatrixLoc       = glGetUniformLocation(programId1, "viewMatrix");
 	projectionMatrixLoc = glGetUniformLocation(programId1, "projMatrix");
+	distanceMatrixLoc   = glGetUniformLocation(programId1, "distanceMatrix");
+
+	ambientLightLoc     = glGetUniformLocation(programId1, "ambientLight");
+	materialALoc        = glGetUniformLocation(programId1, "materialA");
+	materialDLoc        = glGetUniformLocation(programId1, "materialD");
+	materialSLoc        = glGetUniformLocation(programId1, "materialS");
+	cameraPositionLoc   = glGetUniformLocation(programId1, "cameraPosition");
+	whichDrawLoc   		= glGetUniformLocation(programId1, "whichDraw");
 
 	//colisiones
 	vShader = compileShader("shaders/colision.vsh", GL_VERTEX_SHADER);
@@ -65,19 +162,18 @@ static void initShaders() {
 	modelMatrixLoc2      = glGetUniformLocation(programId2, "modelMatrix");
 	viewMatrixLoc2       = glGetUniformLocation(programId2, "viewMatrix");
 	projectionMatrixLoc2 = glGetUniformLocation(programId2, "projMatrix");
+	distanceMatrixLoc2   = glGetUniformLocation(programId2, "distanceMatrix");
+
 	positionLoc2			= glGetUniformLocation(programId2, "position");
 	radiusLoc2			= glGetUniformLocation(programId2, "radius");
 }
-static const float CUBE_WIDTH = 20;
-static const float CUBE_HEIGHT = 20;
-static const float CUBE_DEPTH = 20;
 
 static void initCube(){
 	float w1 = -CUBE_WIDTH  / 2, w2 = CUBE_WIDTH  / 2;
 	float h1 = -CUBE_HEIGHT / 2, h2 = CUBE_HEIGHT / 2;
 	float d1 = -CUBE_DEPTH  / 2, d2 = CUBE_DEPTH  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // AtrÃ¡s
+			             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -92,12 +188,20 @@ static void initCube(){
 	};
 	float wh = (float) CUBE_WIDTH / CUBE_HEIGHT;
 	float dh = (float) CUBE_DEPTH / CUBE_HEIGHT;
-	float texcoords[] = {   0, 2,			0, 0,  		2 * wh, 0,    2 * wh, 2,
-					           	2 * wh, 2,  	2 * wh, 0,  0, 0,     0, 2,
-							    0, 2,       	0, 0,  		2 * dh, 0,  2 * dh, 2,
-								2 * dh, 2,  	2 * dh, 0,  0, 0,     0, 2,
-								0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 2,
-								2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 2,
+	float texcoords[] = {   	0, 2,			0, 0,  		2 * wh, 0,    	2 * wh, 2,
+					           	2 * wh, 2,  	2 * wh, 0,  0, 0,     		0, 2,
+							    0, 2,       	0, 0,  		2 * dh, 0, 		2 * dh, 2,
+								2 * dh, 2,  	2 * dh, 0,  0, 0,     		0, 2,
+								0, 2,      		0, 0,  		2 * wh, 0,   	2 * wh, 2,
+								2 * wh, 2,  	2 * wh, 0,  0, 0,        	0, 2,
+	};
+	float normals[] = {
+							0,0,-1,	0,0,-1,	0,0,-1,	0,0,-1,
+							0,0,1,	0,0,1,	0,0,1,	0,0,1,
+							-1,0,0,	-1,0,0,	-1,0,0,	-1,0,0,
+							1,0,0,	1,0,0,	1,0,0,	1,0,0,
+							0,-1,0,	0,-1,0,	0,-1,0,	0,-1,0,
+							0,1,0,	0,1,0,	0,1,0,	0,1,0
 		};
 
 	GLuint indices[4*6+5];
@@ -114,8 +218,8 @@ static void initCube(){
 	glUseProgram(programId1);
 	glGenVertexArrays(1, &cubeVA);
 	glBindVertexArray(cubeVA);
-	GLuint buffers[4];
-	glGenBuffers(4, buffers);
+	GLuint buffers[5];
+	glGenBuffers(5, buffers);
 
 	glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
@@ -135,6 +239,11 @@ static void initCube(){
 	glBufferData(GL_ARRAY_BUFFER, sizeof(texcoords), texcoords, GL_STATIC_DRAW);
 	glVertexAttribPointer(vertexTexcoordLoc, 2, GL_FLOAT, 0, 0, 0);
 	glEnableVertexAttribArray(vertexTexcoordLoc);
+
+	glBindBuffer(GL_ARRAY_BUFFER, buffers[4]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(normals), normals, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexNormalLoc, 3, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexNormalLoc);
 
 	glPrimitiveRestartIndex(RESET);
 	glEnable(GL_PRIMITIVE_RESTART);
@@ -162,29 +271,99 @@ static void initCube(){
 
 }
 
+static void initLightCube(){
+	float width = CUBE_WIDTH/laberinto.size;
+	float height = CUBE_HEIGHT/laberinto.size;
+	float depth = CUBE_DEPTH/laberinto.size;
+	float w1 = -width  / 2, w2 = width  / 2;
+	float h1 = -height / 2, h2 = height / 2;
+	float d1 = -depth  / 2, d2 = depth  / 2;
+		float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
+				             	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
+								w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
+								w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
+								w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
+								w1, h2, d2, 	w1, h2, d1, 	w2, h2, d1, 	w2, h2, d2   // Arriba
+		};
+		float colors[] = {  	1,1,0,	1,1,0,	1,1,0,	1,1,0,
+								1,1,0,	1,1,0,	1,1,0,	1,1,0,
+								1,1,0,	1,1,0,	1,1,0,	1,1,0,
+								1,1,0,	1,1,0,	1,1,0,	1,1,0,
+								1,1,0,	1,1,0,	1,1,0,	1,1,0,
+								1,1,0,	1,1,0,	1,1,0,	1,1,0
+		};
+		float normals[] = {
+								0,0,1,	0,0,1,	0,0,1,	0,0,1,
+								0,0,-1,	0,0,-1,	0,0,-1,	0,0,-1,
+								1,0,0,	1,0,0,	1,0,0,	1,0,0,
+								-1,0,0,	-1,0,0,	-1,0,0,	-1,0,0,
+								0,1,0,	0,1,0,	0,1,0,	0,1,0,
+								0,-1,0,	0,-1,0,	0,-1,0,	0,-1,0
+			};
+
+		GLuint indices[4*6+5];
+		int pos = 0;
+		for(int i = 0; i<6;i++){
+			for(int j = 0;j<4;j++){
+				indices[pos] = i*4+j;
+				pos++;
+			}
+			if(i<5)indices[pos] = RESET;
+			pos++;
+		}
+		//Bindeo para dibujo
+		glUseProgram(programId1);
+		glGenVertexArrays(1, &lightCubeVA);
+		glBindVertexArray(lightCubeVA);
+		GLuint buffers[4];
+		glGenBuffers(4, buffers);
+
+		glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+		glVertexAttribPointer(vertexPositionLoc, 3, GL_FLOAT, 0, 0, 0);
+		glEnableVertexAttribArray(vertexPositionLoc);
+
+		glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+		glVertexAttribPointer(vertexColorLoc, 3, GL_FLOAT, 0, 0, 0);
+		glEnableVertexAttribArray(vertexColorLoc);
+
+		lightCubeIndBufferId = buffers[2];
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[2]);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices,GL_STATIC_DRAW);
+
+		glBindBuffer(GL_ARRAY_BUFFER, buffers[3]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(normals), normals, GL_STATIC_DRAW);
+		glVertexAttribPointer(vertexNormalLoc, 3, GL_FLOAT, 0, 0, 0);
+		glEnableVertexAttribArray(vertexNormalLoc);
+
+		glPrimitiveRestartIndex(RESET);
+		glEnable(GL_PRIMITIVE_RESTART);
+}
+
 static void drawCube(GLuint VA, GLuint id){
 	glBindVertexArray(VA);
+	glBindTexture(GL_TEXTURE_2D, glass);
 	glBindBuffer(GL_ARRAY_BUFFER,id);
 	glDrawElements(GL_TRIANGLE_FAN, 4*6+5, GL_UNSIGNED_INT, 0);
 }
 
-
-//Informacion y funciones del laberinto
-
-typedef struct{
-	int size;
-	int**faces[6];
-	int*edge[12];
-	int vertex[8];
-
-}Laberinto;
-Laberinto laberinto;
-int startX, startY,finalFace, finalX, finalY;
+void findPoint(int x, int y, int face, vec3 point){
+	float desp = CUBE_WIDTH/laberinto.size;
+	vec3 right[] = 	{{1,0,0},{1,0,0}, {1,0,0}, {1,0,0}, {0,0,1}, {0,0,-1}};
+	vec3 up[]	=	{{0,1,0},{0,0,-1},{0,-1,0},{0,0,1}, {0,1,0}, {0,1,0}};
+	point[0] = up[face][0]*((CUBE_DEPTH/2+desp/2)-y*desp)-right[face][0]*((CUBE_DEPTH/2+desp/2)-x*desp);
+	point[1] = up[face][1]*((CUBE_DEPTH/2+desp/2)-y*desp)-right[face][1]*((CUBE_DEPTH/2+desp/2)-x*desp);
+	point[2] = up[face][2]*((CUBE_DEPTH/2+desp/2)-y*desp)-right[face][2]*((CUBE_DEPTH/2+desp/2)-x*desp);
+	point[0] = (face == 5)?CUBE_DEPTH/2+desp/2:(face == 4)?-(CUBE_DEPTH/2+desp/2):point[0];
+	point[1] = (face == 1)?CUBE_DEPTH/2+desp/2:(face == 3)?-(CUBE_DEPTH/2+desp/2):point[1];
+	point[2] = (face == 0)?CUBE_DEPTH/2+desp/2:(face == 2)?-(CUBE_DEPTH/2+desp/2):point[2];
+}
 
 static void initLaberinto(){
 	//Apertura del archivo
 	FILE *archivo;
-	archivo = fopen("test.txt","r");
+	archivo = fopen("laberinto.txt","r");
 	if(archivo == NULL){
 		printf("No se encontro el archivo, procedo con la muertacion");
 		exit(-1);
@@ -217,6 +396,7 @@ static void initLaberinto(){
 	for(int vertice = 0; vertice <8; vertice ++)
 		fscanf(archivo, "%d",&l.vertex[vertice]);
 
+	int startX, startY,finalFace, finalX, finalY;
 	//Se almacena el punto inicial de la esfera
 	fscanf(archivo,"%d",&startX);
 	fscanf(archivo,"%d",&startY);
@@ -229,36 +409,16 @@ static void initLaberinto(){
 
 	//Se guardan en las variables globales
 	laberinto = l;
+
+	//Se detectan los puntos finales e iniciales
+	findPoint(finalX, finalY, finalFace, finalPoint);
+	vec3 startPoint;
+	findPoint(startX, startY,0,startPoint);
+	sphereX = startPoint[0];
+	sphereY = startPoint[1];
+	sphereZ = startPoint[2];
+
 }
-//
-//static void printLaberinto(){
-//	Laberinto l = laberinto;
-//	printf("Size: %d\n",l.size);
-//
-//	for(int face = 0; face< 6; face++){
-//		printf("Cara %d\n",face);
-//		for(int i = 0; i< l.size; i++){
-//			for(int j = 0; j<l.size; j++){
-//			printf("%d ",l.faces[face][i][j]);
-//			}
-//		printf("\n");
-//		}
-//	}
-//
-//	for(int arista = 0; arista <12; arista++){
-//		printf("Arista %d\n",arista);
-//		for(int i = 0; i<l.size;i++){
-//			printf("%d ",l.edge[arista][i]);
-//		}
-//		printf("\n");
-//	}
-//	printf("Vertices:");
-//	for(int vertex = 0; vertex<8; vertex++){
-//		printf("%d ",l.vertex[vertex]);
-//	}
-//	printf("\n");
-//
-//}
 
 static void initPared(){
 
@@ -269,7 +429,7 @@ static void initPared(){
 	float h1 = -height / 2, h2 = height / 2;
 	float d1 = -depth  / 2, d2 = depth  / 2;
 	float positions[] = {	w2, h2, d1, 	w2, h1, d1, 	w1, h1, d1, 	w1, h2, d1,  // Frente
-				        	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // AtrÃ¡s
+				        	w2, h2, d2, 	w2, h1, d2, 	w1, h1, d2,		w1, h2, d2,  // Atrás
 							w1, h2, d2, 	w1, h1, d2, 	w1, h1, d1, 	w1, h2, d1,  // Izquierda
 							w2, h2, d1, 	w2, h1, d1, 	w2, h1, d2, 	w2, h2, d2,  // Derecha
 							w1, h1, d1, 	w1, h1, d2, 	w2, h1, d2, 	w2, h1, d1,  // Abajo
@@ -292,6 +452,14 @@ static void initPared(){
 							0, 2,      		0, 0,  		2 * wh, 0,   2 * wh, 2,
 							2 * wh, 2,  	2 * wh, 0,  0, 0,        0, 2,
 	};
+	float normals[] = {
+							0,0,-1,	0,0,-1,	0,0,-1,	0,0,-1,
+							0,0,1,	0,0,1,	0,0,1,	0,0,1,
+							-1,0,0,	-1,0,0,	-1,0,0,	-1,0,0,
+							1,0,0,	1,0,0,	1,0,0,	1,0,0,
+							0,-1,0,	0,-1,0,	0,-1,0,	0,-1,0,
+							0,1,0,	0,1,0,	0,1,0,	0,1,0
+		};
 
 	GLuint indices[4*6+5];
 	int pos = 0;
@@ -308,8 +476,8 @@ static void initPared(){
 	glUseProgram(programId1);
 	glGenVertexArrays(1, &labVA);
 	glBindVertexArray(labVA);
-	GLuint buffers[4];
-	glGenBuffers(3, buffers);
+	GLuint buffers[5];
+	glGenBuffers(5, buffers);
 
 	glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
@@ -329,6 +497,11 @@ static void initPared(){
 	glBufferData(GL_ARRAY_BUFFER, sizeof(texcoords), texcoords, GL_STATIC_DRAW);
 	glVertexAttribPointer(vertexTexcoordLoc, 2, GL_FLOAT, 0, 0, 0);
 	glEnableVertexAttribArray(vertexTexcoordLoc);
+
+	glBindBuffer(GL_ARRAY_BUFFER, buffers[4]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(normals), normals, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexNormalLoc, 3, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexNormalLoc);
 
 	glPrimitiveRestartIndex(RESET);
 	glEnable(GL_PRIMITIVE_RESTART);
@@ -353,40 +526,9 @@ static void initPared(){
 	glEnable(GL_PRIMITIVE_RESTART);
 }
 
-vec3 finalPoint;
-static void initFinalPoint(){
-	float desp = CUBE_WIDTH/laberinto.size;
-	vec3 right[] = 	{{1,0,0},{1,0,0}, {1,0,0}, {1,0,0}, {0,0,1}, {0,0,-1}};
-	vec3 up[]	=	{{0,1,0},{0,0,-1},{0,-1,0},{0,0,1}, {0,1,0}, {0,1,0}};
-			finalPoint[0] = up[finalFace][0]*((CUBE_DEPTH/2+desp/2)-finalY*desp)+right[finalFace][0]*((CUBE_DEPTH/2+desp/2)+finalX*desp);
-			finalPoint[1] = up[finalFace][1]*((CUBE_DEPTH/2+desp/2)-finalY*desp)+right[finalFace][1]*((CUBE_DEPTH/2+desp/2)+finalX*desp);
-			finalPoint[2] = up[finalFace][2]*((CUBE_DEPTH/2+desp/2)-finalY*desp)+right[finalFace][2]*((CUBE_DEPTH/2+desp/2)+finalX*desp);
-			finalPoint[0] = (finalFace == 5)?CUBE_DEPTH/2+desp/2:(finalFace == 4)?-(CUBE_DEPTH/2+desp/2):0;
-			finalPoint[1] = (finalFace == 1)?CUBE_DEPTH/2+desp/2:(finalFace == 3)?-(CUBE_DEPTH/2+desp/2):0;
-			finalPoint[2] = (finalFace == 0)?CUBE_DEPTH/2+desp/2:(finalFace == 2)?-(CUBE_DEPTH/2+desp/2):0;
-}
-
-//Carga la textura.
-static GLuint initTextures(const char *filename, GLint min_mag_filt, GLint wrap_mode)
-{
-	unsigned char *data;
-	unsigned int width, height;
-	GLuint texture;
-
-		glGenTextures(1, &texture);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		loadBMP(filename, &data, &width, &height);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_BGR, GL_UNSIGNED_BYTE, data);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	return texture;
-}
-
 static void drawPared(GLuint VA, GLuint id){
 	glBindVertexArray(VA);
+	glBindTexture(GL_TEXTURE_2D, glass);
 	glBindBuffer(GL_ARRAY_BUFFER,id);
 	glDrawElements(GL_TRIANGLE_FAN, 4*6+5, GL_UNSIGNED_INT, 0);
 }
@@ -467,36 +609,28 @@ static void drawLaberinto(GLuint VA, GLuint id){
 }
 
 
+//Carga la textura.
+static GLuint initTextures(const char *filename, GLint min_mag_filt, GLint wrap_mode)
+{
+	unsigned char *data;
+	unsigned int width, height;
+	GLuint texture;
 
-//Informacion interna de la esfera
-Sphere sphere;
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
+		loadBMP(filename, &data, &width, &height);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_BGR, GL_UNSIGNED_BYTE, data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-
-static const int   SPHERE_COLUMNS = 10;
-static const int   SPHERE_ROWS	  = 10;
-static const float SPHERE_RED	  = 0.8;
-static const float SPHERE_GREEN	  = 0.8;
-static const float SPHERE_BLUE	  = 0.8;
-static float sphereRadius;
-
-//variables que almacena la posicion y seÃ±ala el movimiento de la esfera
-
-static MOTION_TYPE sphereVerticalMove = IDLE;
-static MOTION_TYPE sphereHorizontalMove = IDLE;
-static float sphereSpeed = 0.5;
-static float sphereX = 0;
-static float sphereY = 0;
-static float sphereZ; // = CUBE_DEPTH/2+SPHERE_RADIUS;
-vec3 position;
+	return texture;
+}
 
 static void initSphere(){
-	float desp = CUBE_WIDTH/laberinto.size;
-
 	//Se asignan variables globales
 	sphereRadius = CUBE_WIDTH /laberinto.size*0.8/2;
-	sphereX = -(CUBE_DEPTH/2+desp/2)+desp*startX;
-	sphereY = (CUBE_DEPTH/2+desp/2)-desp*startY;
-	sphereZ = CUBE_DEPTH/2+desp/2;
 
 	//Se crea y bindea la esfera
 	vec3 color = {SPHERE_RED,SPHERE_GREEN,SPHERE_BLUE};
@@ -507,41 +641,55 @@ static void initSphere(){
 	//Se envia el valor del radio para las colisiones
 	glUseProgram(programId2);
 	glUniform1f(radiusLoc2,sphereRadius);
+
+	//Se calcula la velocidad de la esfera
+	sphereSpeed = CUBE_WIDTH/laberinto.size*0.1;
 }
-//Informacion de la cÃ¡mara
-static float rotationSpeed = 1;
-static MOTION_TYPE camaraDirection = IDLE;
 
-// variables de rotaciones y de la cara visible
-Vec4 up = {1,0,0,0};
-Vec4 right ={0,1,0,0};
-int camaraFace = 0;
-MOTION_TYPE camaraLad = DOWN;
-static float const CAMARA_DISTANCE = 50;
+static void initLights() {
+	glUseProgram(programId1);
+	glUniform3fv(ambientLightLoc,  1, ambientLight);
 
-//Valores del raton
-bool leftClick = false;
-bool rightClick = false;
-bool midleClick = false;
+	glUniform3fv(materialALoc,     1, materialA);
+	glUniform3fv(materialDLoc,     1, materialD);
+	glUniform3fv(materialSLoc,     1, materialS);
+
+	glUniform3f(cameraPositionLoc, 0, 0, 0);
+
+	lights[16] = finalPoint[0];
+	lights[17] = finalPoint[1];
+	lights[18] = finalPoint[2];
+
+	glGenBuffers(1, &lightsBufferId);
+	glBindBuffer(GL_UNIFORM_BUFFER, lightsBufferId);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(lights), lights, GL_DYNAMIC_DRAW);
+	GLuint uniformBlockIndex = glGetUniformBlockIndex(programId1, "LightBlock");
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, lightsBufferId);
+	glUniformBlockBinding(programId1, uniformBlockIndex, 0);
+
+}
 
 void moveVerticalSphere();
 void moveHorizontalSphere();
 void returnVerticalSphere();
 void returnHorizontalSphere();
+
 void moveAndCollisionFunc(){
 	glUseProgram(programId2);
 
 	//Se envia la informacion que no cambia
-	//Se envia matriz de proyecciÃ³n
+	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
+	//Se encia la matriz de distancia
+	mIdentity(&distanceColisionMatrix);
+	translate(&distanceColisionMatrix,	-sphereX,-sphereY,-sphereZ-CUBE_WIDTH*2/laberinto.size);
+	glUniformMatrix4fv(distanceMatrixLoc2, 1, true,distanceColisionMatrix.values);
+
 	//se envia matriz de vista
-	glUniformMatrix4fv(viewMatrixLoc2, 1, true, viewMatrix.values);
-
-	//Se envia matriz de modelo
-
-	mIdentity(&modelMatrix);
-	glUniformMatrix4fv(modelMatrixLoc2, 1, true, modelMatrix.values);
+	Mat4 viewSphereColision;
+	mIdentity(&viewSphereColision);
+	glUniformMatrix4fv(viewMatrixLoc2, 1, true, viewSphereColision.values);
 
 
 	//Se mueve y evalua verticalmente
@@ -624,11 +772,7 @@ void moveAndCollisionFunc(){
 
 }
 
-
-
-
 //funciones relacionadas con la vista
-
 static void rotateDirection();
 void viewFunc();
 
@@ -704,33 +848,54 @@ double distanceToFinalPoint(){
 	return sqrt(pow(sphereX-finalPoint[0],2)+pow(sphereY-finalPoint[1],2)+pow(sphereZ-finalPoint[2],2));
 }
 
+void updateFinalPoint(){
+	finalPointCubeAngle = ((finalPointCubeAngle +LIGHTCUBE_SCALECHANGE)<180)?finalPointCubeAngle +LIGHTCUBE_SCALECHANGE:0;
+	finalPointCubeRotationX = (int)(finalPointCubeRotationX +LIGHTCUBE_XCHANGE)%180;
+	finalPointCubeRotationY = (int)(finalPointCubeRotationY +LIGHTCUBE_YCHANGE)%180;
+	finalPointCubeRotationZ = (int)(finalPointCubeRotationZ +LIGHTCUBE_ZCHANGE)%180;
+	finalPointCubeSize = cos(finalPointCubeAngle)*0.5;
+}
+
 //Funciones generales
 static void displayFunc() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//colisiones
 	moveAndCollisionFunc();
+	//Se actualiza la rotacion de la matriz
+	viewFunc();
 
+	//Se actualiza la posicion de la luz
+	lights[4] = sphereX;
+	lights[5] = sphereY;
+	lights[6] = sphereZ;
+	glBindBuffer(GL_UNIFORM_BUFFER, lightsBufferId);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(lights), lights, GL_DYNAMIC_DRAW);
+	GLuint uniformBlockIndex = glGetUniformBlockIndex(programId1, "LightBlock");
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, lightsBufferId);
+	glUniformBlockBinding(programId1, uniformBlockIndex, 0);
 
+	if(whichDraw != 3){
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(programId1);
-	//Se envia matriz de proyecciÃ³n
+	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc, 1, true,projectionMatrix.values);
 
-	//se envia matriz de vista
+	//Se envia la matrix de distancia
+	glUniformMatrix4fv(distanceMatrixLoc, 1, true,distanceMatrix.values);
 
-	//Se actualiza la rotacion de la matriz
-	viewFunc();
+	//se envia matriz de vista
 	glUniformMatrix4fv(viewMatrixLoc, 1, true, viewMatrix.values);
 
 	//Se envia matriz de modelo
 	mIdentity(&modelMatrix);
 	glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
-	//Se dubuja el cubo
+
+	//Se dubuja la base del laberinto
 	drawCube(cubeVA, cubeIndBufferId);
 
-	//SE DIBUJARAN LAS PAREDES
+	//Se dibujan las paredes
 	drawLaberinto(labVA,labIndBufferId);
 
 	//Se dibuja la esfera
@@ -739,6 +904,16 @@ static void displayFunc() {
 	glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
 	sphere_draw(sphere);
 
+	//Se dibuja el cubo del punto final
+	mIdentity(&modelMatrix);
+	translate(&modelMatrix,finalPoint[0], finalPoint[1], finalPoint[2]);
+	rotateX(&modelMatrix,finalPointCubeRotationX);
+	rotateY(&modelMatrix,finalPointCubeRotationY);
+	rotateZ(&modelMatrix,finalPointCubeRotationZ);
+	scale(&modelMatrix,finalPointCubeSize,finalPointCubeSize,finalPointCubeSize);
+	glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
+	drawCube(lightCubeVA,lightCubeIndBufferId);
+	}
 	glutSwapBuffers();
 }
 
@@ -752,7 +927,8 @@ static void reshapeFunc(int w, int h) {
 static void timerFunc(int id) {
 	glutTimerFunc(10, timerFunc, id);
 	glutPostRedisplay();
-	if(distanceToFinalPoint() < sphereRadius*0.5){
+	updateFinalPoint();
+	if(distanceToFinalPoint() < sphereRadius*0.7){
 		exit(0);
 	}
 }
@@ -801,10 +977,14 @@ static void keyPressedFunc(unsigned char key, int x, int y) {
 	case 'W': sphereVerticalMove = UP;break;
 	case 's':
 	case 'S': sphereVerticalMove = DOWN;break;
+	case 'q':
+	case 'Q': whichDraw = fmax(0,whichDraw-1);glUniform1i(whichDrawLoc,whichDraw);break;
+	case 'e':
+	case 'E': whichDraw = fmin(3,whichDraw+1);glUniform1i(whichDrawLoc,whichDraw);break;
 
 	}
 }
-static int clicX, clicY;
+
 static void mousePasiveMotionFunc(int x, int y){
 	clicX = x;
 	clicY = y;
@@ -830,21 +1010,36 @@ static void mouseMotionFunc(int x, int y){
 static void mouseFunc(int button, int state, int x, int y){
 	switch(button){
 	case 0:leftClick = (state == GLUT_DOWN)?true:false;break;
-	//case 1:midleClick = (state == GLUT_UP)?true:false;break;
-	//case 2:rightClick = (state == GLUT_UP)?true:false;break;
+	case 1:midleClick = (state == GLUT_UP)?true:false;break;
+	case 2:rightClick = (state == GLUT_UP)?true:false;break;
+	case 3:
+		camaraDistance = fmin(camaraDistance +CAMARA_CHANGE, MAX_CAMARA_DISTANCE);
+		mIdentity(&distanceMatrix);
+		translate(&distanceMatrix,0,0,-camaraDistance);
+	break;
+	case 4:
+		camaraDistance = fmax(camaraDistance -CAMARA_CHANGE, MIN_CAMARA_DISTANCE);
+		mIdentity(&distanceMatrix);
+		translate(&distanceMatrix,0,0,-camaraDistance);
+		break;
 	}
 }
 
 void init(){
     initShaders();
+    //Init Matrices
     mIdentity(&viewMatrix);
-    translate(&viewMatrix, 0, 0, -CAMARA_DISTANCE);
-    tex = initTextures("textures/Brick.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
+    mIdentity(&distanceMatrix);
+    translate(&distanceMatrix, 0, 0, -camaraDistance);
+    mIdentity(&distanceColisionMatrix);
+    glass = initTextures("textures/Brick.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
     initCube();
     initLaberinto();
     initPared();
+    initLightCube();
     initSphere();
-    initFinalPoint();
+    initLights();
+    glUniform1i(whichDrawLoc,whichDraw);
 }
 
 
@@ -867,18 +1062,11 @@ int main(int argc, char **argv) {
     glewInit();
     glEnable(GL_DEPTH_TEST);
     init();
-    glClearColor(0.1, 0.1, 0.1, 1.0);
+    glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
     glutMainLoop();
 
 	return 0;
 }
-
-
-
-
-
-
-
 
 
 int rotating = 0;
@@ -1212,30 +1400,5 @@ static void rotateDirection(){
 	right.z = z?!neg_z?1:-1:0;
 	//printf("Cara: %d Sub: %d,\t up<%.1f,%.1f,%.1f>, right<%.1f,%.1f,%.1f>\n",camaraFace,v,up.x,up.y,up.z,right.x,right.y,right.z);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

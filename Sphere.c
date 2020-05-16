@@ -60,29 +60,29 @@ Sphere sphere_create(float radius, int parallels, int meridians, vec3 sphereColo
 
 			sphere->positions[count] =  radius * sin(angPhi) * cos(angTheta);
 			sphere->colors[count] = red;
-			sphere->normals[count++] = sin(angPhi) * cos(angTheta);
+			sphere->normals[count++] = -sin(angPhi) * cos(angTheta);
 
 			sphere->positions[count] = radius * sin(angPhi) * sin(angTheta);
 			sphere->colors[count] = green;
-			sphere->normals[count++] = sin(angPhi) * sin(angTheta);
+			sphere->normals[count++] = -sin(angPhi) * sin(angTheta);
 
 			sphere->positions[count] = radius * cos(angPhi);
 			sphere->colors[count] = blue;
-			sphere->normals[count++] = cos(angPhi);
+			sphere->normals[count++] = -cos(angPhi);
 
 			sphere->indixes[indexCount ++] = indexValue++;
 
 			sphere->positions[count] = radius * sin(angPhi + incPhi) * cos(angTheta);
 			sphere->colors[count] = red;
-			sphere->normals[count++] = sin(angPhi + incPhi) * cos(angTheta);;
+			sphere->normals[count++] = -sin(angPhi + incPhi) * cos(angTheta);
 
 			sphere->positions[count] = radius * sin(angPhi+ incPhi) * sin(angTheta);
 			sphere->colors[count] = green;
-			sphere->normals[count++] = sin(angPhi+ incPhi) * sin(angTheta);
+			sphere->normals[count++] = -sin(angPhi+ incPhi) * sin(angTheta);
 
 			sphere->positions[count] = radius * cos(angPhi+ incPhi);
 			sphere->colors[count] = blue;
-			sphere->normals[count++] = cos(angPhi+ incPhi);
+			sphere->normals[count++] = -cos(angPhi+ incPhi);
 
 			sphere->indixes[indexCount ++] = indexValue++;
 
@@ -119,6 +119,7 @@ void sphere_bind(Sphere sphere, GLuint vertexPosLoc, GLuint vertexColorLoc, GLui
     glVertexAttribPointer(vertexNormalLoc, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(vertexNormalLoc);
 
+    //Indices
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphere->sphereBuffers[3]);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, (sizeof(GLuint) * (sphere->vertexNum + sphere->parallels)), sphere->indixes, GL_STATIC_DRAW);
 	glPrimitiveRestartIndex(RESET);

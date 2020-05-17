@@ -13,26 +13,41 @@
 
 
 
-static Mat4   modelMatrix, projectionMatrix, viewMatrix, distanceMatrix, distanceColisionMatrix;
+static Mat4   modelMatrix, projectionMatrix, viewMatrix, distanceMatrix, viewColisionMatrix;
 static GLuint programId1, vertexPositionLoc,vertexColorLoc, vertexNormalLoc, vertexTexcoordLoc,  modelMatrixLoc,  projectionMatrixLoc,  viewMatrixLoc, distanceMatrixLoc; //dibujado
-static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2, radiusLoc2,distanceMatrixLoc2; //colision
+static GLuint programId2, vertexPositionLoc2, modelMatrixLoc2,  projectionMatrixLoc2,  viewMatrixLoc2, positionLoc2, radiusLoc2; //colision
+static GLuint programId3, vertexPositionLoc3, vertexTexcoordLoc3, textureMoveLoc3;
 
-GLuint cubeVA, cubeIndBufferId; 			//dibujado de cubo central
-GLuint cubeVA2, cubeIndBufferId2;			//colision del cubo central
+GLuint cubeVA, cubeIndBufferId; 		//dibujado de cubo central
+GLuint cubeVA2, cubeIndBufferId2;		//colision del cubo central
 
 GLuint labVA,  labIndBufferId; 			//dibujado del laberinto
 GLuint labVA2, labIndBufferId2;			//colision del laberinto
 
+GLuint backGroundVA, frontGroundVA;		//dibujado simple en el frente y atras.
+
 GLuint lightCubeVA, lightCubeIndBufferId; 			//dibujado de cubo de luz
 
-GLuint glass; //textura 1 (grass)
+bool menu = true;
 
+//Texturas
+GLuint grass, bricks, sky, victory, instructions;
 
+//movimiento del fondo
+float backGroundMove[] = {0,0};
+bool drawVictory = false;
+
+//Selecion de modo de dibujado
 static GLuint whichDrawLoc;
 static int whichDraw = 0;
+
+//Color de fondo
 static const float clearColor[] = {0.0,0,0,1};
 
-
+//Dimensiones de la superficie
+static const float CUBE_WIDTH = 40;
+static const float CUBE_HEIGHT = 40;
+static const float CUBE_DEPTH = 40;
 //Iluminacion
 static GLuint lightsBufferId;
 
@@ -44,15 +59,16 @@ static vec3 ambientLight  = {0, 0, 0};
 static vec3 materialA     = {0.8, 0.8, 0.8};
 static vec3 materialD     = {0.3, 0.3, 0.3};
 static vec3 materialS     = {0.6, 0.6, 0.6};
-							//color	 //algo		//posicion		//algo		direccion	algo
-static float lights[]   = { 1, 1, 1,  0,   		0, 0, 0,  		1,	 		0, 0, 1,   0,		// Luz de la esfera
+
+static float lights[]   = { 1, 1, 1,  0,   		0, 0, 0,  		1,	 		0, 0, 0,   0,		// Luz de la esfera
 							1, 1, 0,  0,   		0, 0, 0,  		128,	 	0, 0, -1,  0,
+							1, 1, 1,  0,   		CUBE_WIDTH*2, CUBE_WIDTH/2, 0,  1,	 	0, 0, -1,  0,
 };
 
 #define RESET 0xFFFFFFFF
 
 typedef enum { IDLE, LEFT, RIGHT, FRONT, BACK, UP, DOWN } MOTION_TYPE;
-vec3 position;
+
 
 //Informacion de la cámara
 static float rotationSpeed = 1;
@@ -62,15 +78,15 @@ static MOTION_TYPE camaraDirection = IDLE;
 Vec4 up = {1,0,0,0};
 Vec4 right ={0,1,0,0};
 int camaraFace = 0;
+
 MOTION_TYPE camaraLad = DOWN;
 static float const MIN_CAMARA_DISTANCE = 50;
 static float const MAX_CAMARA_DISTANCE = 150;
 static float const CAMARA_CHANGE = 1;
+vec3 position;
 static float camaraDistance = 100;
 
-static const float CUBE_WIDTH = 40;
-static const float CUBE_HEIGHT = 40;
-static const float CUBE_DEPTH = 40;
+
 
 //Valores del raton
 static int clicX, clicY;
@@ -162,10 +178,56 @@ static void initShaders() {
 	modelMatrixLoc2      = glGetUniformLocation(programId2, "modelMatrix");
 	viewMatrixLoc2       = glGetUniformLocation(programId2, "viewMatrix");
 	projectionMatrixLoc2 = glGetUniformLocation(programId2, "projMatrix");
-	distanceMatrixLoc2   = glGetUniformLocation(programId2, "distanceMatrix");
 
 	positionLoc2			= glGetUniformLocation(programId2, "position");
 	radiusLoc2			= glGetUniformLocation(programId2, "radius");
+
+	//Screens
+	vShader = compileShader("shaders/screen.vsh", GL_VERTEX_SHADER);
+	if(!shaderCompiled(vShader)) return;
+	fShader = compileShader("shaders/screen.fsh", GL_FRAGMENT_SHADER);
+	if(!shaderCompiled(fShader)) return;
+	programId3 = glCreateProgram();
+	glAttachShader(programId3, vShader);
+	glAttachShader(programId3, fShader);
+	glLinkProgram(programId3);
+
+	vertexPositionLoc3   = glGetAttribLocation(programId3, "vertexPosition");
+	vertexTexcoordLoc3  = glGetAttribLocation(programId3, "vertexTexcoord");
+
+	textureMoveLoc3   = glGetUniformLocation(programId3, "textureMove");
+
+}
+
+static void initScreen(GLuint* VA,float posZ, float vertical, float horizontal){
+	float positions[] = {-1,-1,posZ,	-1,1,posZ,	1,1,posZ, 					1,-1,posZ};
+	float texcoords[] = {0,0,			0,vertical,	horizontal,vertical,		horizontal,0};
+
+	glUseProgram(programId3);
+	glGenVertexArrays(1, VA);
+	glBindVertexArray(VA[0]);
+	GLuint buffers[2];
+	glGenBuffers(2, buffers);
+
+	glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexPositionLoc3, 3, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexPositionLoc3);
+
+	glBindBuffer(GL_ARRAY_BUFFER, buffers[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(texcoords), texcoords, GL_STATIC_DRAW);
+	glVertexAttribPointer(vertexTexcoordLoc3, 2, GL_FLOAT, 0, 0, 0);
+	glEnableVertexAttribArray(vertexTexcoordLoc3);
+}
+
+static void initScreens(){
+	initScreen(&backGroundVA, 0.999999,1,1);
+	initScreen(&frontGroundVA,-1,1,1);
+}
+
+static void drawScreen(GLuint VA){
+	glBindVertexArray(VA);
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
 static void initCube(){
@@ -188,12 +250,13 @@ static void initCube(){
 	};
 	float wh = (float) CUBE_WIDTH / CUBE_HEIGHT;
 	float dh = (float) CUBE_DEPTH / CUBE_HEIGHT;
-	float texcoords[] = {   	0, 2,			0, 0,  		2 * wh, 0,    	2 * wh, 2,
-					           	2 * wh, 2,  	2 * wh, 0,  0, 0,     		0, 2,
-							    0, 2,       	0, 0,  		2 * dh, 0, 		2 * dh, 2,
-								2 * dh, 2,  	2 * dh, 0,  0, 0,     		0, 2,
-								0, 2,      		0, 0,  		2 * wh, 0,   	2 * wh, 2,
-								2 * wh, 2,  	2 * wh, 0,  0, 0,        	0, 2,
+	int times = 6;
+	float texcoords[] = {   	0, times,				0, 0,  				times * wh, 0,    	times * wh, times,
+								times * wh, times,  	times * wh, 0,  	0, 0,     			0, times,
+							    0, times,       		0, 0,  				times * dh, 0, 		times * dh, times,
+								times * dh, times,  	times * dh, 0,  	0, 0,     			0, times,
+								0, times,      			0, 0,  				times * wh, 0,   	times * wh, times,
+								times * wh, times,  	times * wh, 0,  	0, 0,        		0, times,
 	};
 	float normals[] = {
 							0,0,-1,	0,0,-1,	0,0,-1,	0,0,-1,
@@ -343,7 +406,6 @@ static void initLightCube(){
 
 static void drawCube(GLuint VA, GLuint id){
 	glBindVertexArray(VA);
-	glBindTexture(GL_TEXTURE_2D, glass);
 	glBindBuffer(GL_ARRAY_BUFFER,id);
 	glDrawElements(GL_TRIANGLE_FAN, 4*6+5, GL_UNSIGNED_INT, 0);
 }
@@ -528,7 +590,6 @@ static void initPared(){
 
 static void drawPared(GLuint VA, GLuint id){
 	glBindVertexArray(VA);
-	glBindTexture(GL_TEXTURE_2D, glass);
 	glBindBuffer(GL_ARRAY_BUFFER,id);
 	glDrawElements(GL_TRIANGLE_FAN, 4*6+5, GL_UNSIGNED_INT, 0);
 }
@@ -608,9 +669,7 @@ static void drawLaberinto(GLuint VA, GLuint id){
 	loadIdentity(&modelMatrix);
 }
 
-
-//Carga la textura.
-static GLuint initTextures(const char *filename, GLint min_mag_filt, GLint wrap_mode)
+static GLuint initTexture(const char *filename, GLint min_mag_filt, GLint wrap_mode)
 {
 	unsigned char *data;
 	unsigned int width, height;
@@ -626,6 +685,14 @@ static GLuint initTextures(const char *filename, GLint min_mag_filt, GLint wrap_
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	return texture;
+}
+
+static void initTextures(){
+    grass = initTexture("textures/grass.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
+    bricks = initTexture("textures/Brick.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
+    sky = initTexture("textures/sky.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
+    victory = initTexture("textures/victory.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
+    instructions = initTexture("textures/instructions.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
 }
 
 static void initSphere(){
@@ -681,15 +748,10 @@ void moveAndCollisionFunc(){
 	//Se envia matriz de proyección
 	glUniformMatrix4fv(projectionMatrixLoc2, 1, true, projectionMatrix.values);
 
-	//Se encia la matriz de distancia
-	mIdentity(&distanceColisionMatrix);
-	translate(&distanceColisionMatrix,	-sphereX,-sphereY,-sphereZ-CUBE_WIDTH*2/laberinto.size);
-	glUniformMatrix4fv(distanceMatrixLoc2, 1, true,distanceColisionMatrix.values);
-
-	//se envia matriz de vista
-	Mat4 viewSphereColision;
-	mIdentity(&viewSphereColision);
-	glUniformMatrix4fv(viewMatrixLoc2, 1, true, viewSphereColision.values);
+	//Se encia la matriz de vista
+	mIdentity(&viewColisionMatrix);
+	translate(&viewColisionMatrix,	-sphereX,-sphereY,-sphereZ-CUBE_WIDTH*2/laberinto.size);
+	glUniformMatrix4fv(viewMatrixLoc2, 1, true, viewColisionMatrix.values);
 
 
 	//Se mueve y evalua verticalmente
@@ -875,8 +937,27 @@ static void displayFunc() {
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, lightsBufferId);
 	glUniformBlockBinding(programId1, uniformBlockIndex, 0);
 
-	if(whichDraw != 3){
+	if(whichDraw != 2){
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//Se dibuja el fondo
+	glUseProgram(programId3);
+	glUniform2f(textureMoveLoc3,backGroundMove[0],backGroundMove[1]);
+	glBindTexture(GL_TEXTURE_2D, sky);
+	drawScreen(backGroundVA);
+	backGroundMove[0] = ((backGroundMove[0]+0.0001)>1)?0:backGroundMove[0]+0.0001;
+
+	//Se dibuja el frente
+	if(drawVictory){
+		glUniform2f(textureMoveLoc3,0,0);
+		glBindTexture(GL_TEXTURE_2D, victory);
+		drawScreen(frontGroundVA);
+	}
+	if(menu){
+			glUniform2f(textureMoveLoc3,0,0);
+			glBindTexture(GL_TEXTURE_2D, instructions);
+			drawScreen(frontGroundVA);
+		}
 
 	glUseProgram(programId1);
 	//Se envia matriz de proyección
@@ -893,9 +974,11 @@ static void displayFunc() {
 	glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
 
 	//Se dubuja la base del laberinto
+	glBindTexture(GL_TEXTURE_2D, grass);
 	drawCube(cubeVA, cubeIndBufferId);
 
 	//Se dibujan las paredes
+	glBindTexture(GL_TEXTURE_2D, bricks);
 	drawLaberinto(labVA,labIndBufferId);
 
 	//Se dibuja la esfera
@@ -913,6 +996,8 @@ static void displayFunc() {
 	scale(&modelMatrix,finalPointCubeSize,finalPointCubeSize,finalPointCubeSize);
 	glUniformMatrix4fv(modelMatrixLoc, 1, true, modelMatrix.values);
 	drawCube(lightCubeVA,lightCubeIndBufferId);
+
+
 	}
 	glutSwapBuffers();
 }
@@ -929,7 +1014,7 @@ static void timerFunc(int id) {
 	glutPostRedisplay();
 	updateFinalPoint();
 	if(distanceToFinalPoint() < sphereRadius*0.7){
-		exit(0);
+		drawVictory = true;
 	}
 }
 
@@ -968,6 +1053,8 @@ static void specialKeyPressedFunc(int key, int x, int y) {
 
 static void keyPressedFunc(unsigned char key, int x, int y) {
 	if(key == 27)exit(0);
+	if(key == 13)menu = !menu;
+	if(menu)return;
 	switch(key) {
 	case 'a':
 	case 'A': sphereHorizontalMove = LEFT;break;
@@ -980,7 +1067,7 @@ static void keyPressedFunc(unsigned char key, int x, int y) {
 	case 'q':
 	case 'Q': whichDraw = fmax(0,whichDraw-1);glUniform1i(whichDrawLoc,whichDraw);break;
 	case 'e':
-	case 'E': whichDraw = fmin(3,whichDraw+1);glUniform1i(whichDrawLoc,whichDraw);break;
+	case 'E': whichDraw = fmin(2,whichDraw+1);glUniform1i(whichDrawLoc,whichDraw);break;
 
 	}
 }
@@ -991,7 +1078,7 @@ static void mousePasiveMotionFunc(int x, int y){
 
 }
 static void mouseMotionFunc(int x, int y){
-	if(camaraDirection != IDLE || !leftClick)return;
+	if(camaraDirection != IDLE || !leftClick || menu)return;
 	float disX = (abs(x - clicX))/(float)glutGet(GLUT_WINDOW_WIDTH);
 	float disY = (abs(y - clicY))/(float)glutGet(GLUT_WINDOW_HEIGHT);
 	if(disX > disY){
@@ -1031,8 +1118,9 @@ void init(){
     mIdentity(&viewMatrix);
     mIdentity(&distanceMatrix);
     translate(&distanceMatrix, 0, 0, -camaraDistance);
-    mIdentity(&distanceColisionMatrix);
-    glass = initTextures("textures/Brick.bmp", GL_LINEAR, GL_CLAMP_TO_EDGE);
+
+    initTextures();
+    initScreens();
     initCube();
     initLaberinto();
     initPared();

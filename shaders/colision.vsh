@@ -9,6 +9,6 @@ uniform mat4 projMatrix;
 out vec4 worldPosition;
 void main() {
 	worldPosition = modelMatrix * vec4(vertexPosition,1);
-    gl_Position = projMatrix * viewMatrix * worldPosition;
+    gl_Position = projMatrix *viewMatrix * worldPosition;
 
 }

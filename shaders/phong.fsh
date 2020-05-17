@@ -64,10 +64,9 @@ void main() {
    }
    if(whichDraw == 0)
 	   pixelColor = vec4(clamp(tempPixelColor, 0, 1), 1) * texture(myTexture, vertexTexcoordToFS);
-   else if(whichDraw == 1)
-	   pixelColor = vec4(vertexColorToFS,1)*0.5 + texture(myTexture, vertexTexcoordToFS)*0.5;
    else
-	   pixelColor = vec4(vertexColorToFS,1);
+	   pixelColor = texture(myTexture, vertexTexcoordToFS);
+
 }
 
 void maint() {
